@@ -6,7 +6,7 @@
         "context"   : "<embedded>::miter"
     },
     "spec" : {
-        "pycspec" : "myspecs/top",
+        "pycspec" : "myspecs/tage.top",
         "k"        : 2
     }
 }

@@ -113,7 +113,7 @@ class tage_predictor(Module):
         self.c_T4 = tage_table("c_T4")
 
 
-class top(Module):
+class top_(Module):
     def __init__(self, name="", **kwargs) -> None:
         super().__init__(name, **kwargs)
 
@@ -128,6 +128,11 @@ class top(Module):
         self.prediction_o = Logic(1, "prediction_o")
 
         self.tp = tage_predictor("tp")
+
+
+class top(top_):
+    def __init__(self, name="", **kwargs) -> None:
+        super().__init__(name, **kwargs)
 
     def input(self):
         # Reset input

@@ -296,6 +296,26 @@ def get_pyconfig(config, args: PYCArgs) -> PYConfig:
     )
 
 
+def setup_pyc_tmgr_jg(args: PYCArgs) -> tuple[bool, PYConfig, PYCManager]:
+    with open(args.path, "r") as f:
+        config = json.load(f)
+
+    try:
+        validate(instance=config, schema=CONFIG_SCHEMA)
+    except ValidationError as e:
+        logger.error(f"Config schema validation failed: {e.message}")
+        logger.error(
+            f"Please check schema:\n{json.dumps(CONFIG_SCHEMA, indent=4, sort_keys=True, separators=(',', ': '))}"
+        )
+        sys.exit(1)
+
+    pyconfig = get_pyconfig(config, args)
+    tmgr = PYCManager(pyconfig)
+    is_connected = mock_or_connect(pyconfig, args.port)
+
+    return is_connected, pyconfig, tmgr
+
+
 def start(task: PYCTask, args: PYCArgs) -> tuple[PYConfig, PYCManager, Module]:
 
     with open(args.path, "r") as f:
