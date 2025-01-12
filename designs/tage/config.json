@@ -1,0 +1,12 @@
+{
+    "jasper" : {
+        "jdir"      : "designs/tage",
+        "script"    : "tage.tcl",
+        "pycfile"   : "tage.pyc.sv",
+        "context"   : "<embedded>::miter"
+    },
+    "spec" : {
+        "pycspec" : "myspecs/top",
+        "k"        : 2
+    }
+}

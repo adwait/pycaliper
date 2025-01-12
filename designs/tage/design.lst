@@ -1,0 +1,7 @@
+// header files
+${DESIGN_HOME}/tage-predictor/src/include/common_defines.svh
+// design files
+${DESIGN_HOME}/tage-predictor/src/v/tage_predictor.sv
+${DESIGN_HOME}/tage-predictor/src/v/bht.sv
+${DESIGN_HOME}/tage-predictor/src/v/tage_table.sv
+${DESIGN_HOME}/tage-predictor/src/v/top.sv
