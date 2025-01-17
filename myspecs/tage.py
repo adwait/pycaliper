@@ -4,6 +4,13 @@ from pycaliper.per.per import unroll
 from dataclasses import dataclass
 
 
+INIT = Const(0b00, 2)
+USER = Const(0b01, 2)
+PRIV = Const(0b10, 2)
+SHAR = Const(0b11, 2)
+BOUNDARY = Const(0x80000000, 32)
+
+
 @dataclass
 class tage_config:
     # `define BR_TAKEN        1'b1
@@ -43,6 +50,21 @@ class bht(Module):
         self.bht_data = LogicArray(
             lambda: Logic(2), 1 << config.BHT_IDX_WIDTH, name="bht_data"
         )
+
+        self.domain_i = Logic(2, "domain_i")
+        self.bht_data_priv = LogicArray(
+            lambda: Logic(2), 1 << config.BHT_IDX_WIDTH, name="bht_data_priv"
+        )
+        self.bht_data_user = LogicArray(
+            lambda: Logic(2), 1 << config.BHT_IDX_WIDTH, name="bht_data_user"
+        )
+        self.bht_targ_priv = LogicArray(
+            lambda: Logic(32), 1 << config.BHT_IDX_WIDTH, name="bht_targ_priv"
+        )
+        self.bht_targ_user = LogicArray(
+            lambda: Logic(32), 1 << config.BHT_IDX_WIDTH, name="bht_targ_user"
+        )
+
         # Outputs
         self.prediction_o = Logic(1, "prediction_o")
 
@@ -62,12 +84,17 @@ class tage_table(Module):
         self.hash_idx_i = Logic(config.TAGE_IDX_WIDTH, "hash_idx_i")
         # input logic [8:0] hash_tag_i,
         self.hash_tag_i = Logic(9, "hash_tag_i")
+        self.targ_i = Logic(32, "targ_i")
+        self.domain_i = Logic(2, "domain_i")
 
         # State
         self.ctr = LogicArray(lambda: Logic(3), 1 << config.TAGE_IDX_WIDTH, name="ctr")
         self.tag = LogicArray(lambda: Logic(9), 1 << config.TAGE_IDX_WIDTH, name="tag")
         self.u = LogicArray(lambda: Logic(2), 1 << config.TAGE_IDX_WIDTH, name="u")
 
+        self.targ = LogicArray(
+            lambda: Logic(32), 1 << config.TAGE_IDX_WIDTH, name="targ"
+        )
         self.isolation_state = LogicArray(
             lambda: Logic(2), 1 << config.TAGE_IDX_WIDTH, name="isolation_state"
         )
@@ -81,6 +108,7 @@ class tage_table(Module):
         # Outputs
         # output logic prediction_o, tag_hit_o, new_entry_o,
         self.prediction_o = Logic(1, "prediction_o")
+        self.targ_o = Logic(32, "targ_o")
         self.tag_hit_o = Logic(1, "tag_hit_o")
         self.new_entry_o = Logic(1, "new_entry_o")
         # output logic [1:0] u_o
@@ -116,9 +144,11 @@ class tage_predictor(Module):
         self.c_T3 = tage_table("c_T3")
         self.c_T4 = tage_table("c_T4")
 
+        self.prev_domain = Logic(2, "prev_domain")
+
 
 class top_(Module):
-    def __init__(self, name="", **kwargs) -> None:
+    def __init__(self, name="", config: tage_config = tage_config(), **kwargs) -> None:
         super().__init__(name, **kwargs)
 
         self.rst_i = Logic(1, "rst_i")
@@ -132,8 +162,11 @@ class top_(Module):
 
         # self.tage_prediction_o = Logic(33, "tage_prediction_o")
         self.prediction_o = Logic(1, "prediction_o")
+        self.targ_o = Logic(32, "targ_o")
 
         self.tp = tage_predictor("tp")
+
+        self.config = config
 
 
 class top(top_):
@@ -156,6 +189,8 @@ class top(top_):
 
         self.eq(self.domain_i)
 
+        # self.when(self.domain_i == PRIV)(self.br_result_i)
+
     def state(self):
         self.eq(self.tp.ghist)
         self.eq(self.tp.alt_ctr)
@@ -175,6 +210,10 @@ class top(top_):
             self.eq(tab.u)
             self.eq(tab.tag)
 
+            # when(tab.isolation_state[i] == PRIV)
+            # when(tab.isolation_state[i] == PRIV)
+            # when(tab.isolation_state[i] == PRIV)
+
             self.eq(tab.isolation_state)
 
             # Aux state
@@ -185,3 +224,23 @@ class top(top_):
         # Outer main equivalence signal
         # self.eq(self.prediction_o)
         pass
+
+
+class boundary_spec(top_):
+    def __init__(self, name="", config: tage_config = tage_config(), **kwargs) -> None:
+        super().__init__(name, config, **kwargs)
+
+    def input(self):
+        self.inv((~(self.domain_i == PRIV)) | (self.tp.idx_i < BOUNDARY))
+
+    def state(self):
+        for i in range(1 << self.config.BHT_IDX_WIDTH):
+            self.inv(self.tp.c_T0.bht_targ_priv[i] < BOUNDARY)
+        for tab in [self.tp.c_T1, self.tp.c_T2, self.tp.c_T3, self.tp.c_T4]:
+            for i in range(1 << self.config.TAGE_IDX_WIDTH):
+                self.inv(~(tab.isolation_state[i] == PRIV) | (tab.targ[i] < BOUNDARY))
+
+            self.inv((~(tab.domain_i == PRIV)) | (tab.targ_i < BOUNDARY))
+
+    def output(self):
+        self.inv((~(self.tp.prev_domain == PRIV)) | (self.targ_o < BOUNDARY))
