@@ -68,6 +68,10 @@ class tage_table(Module):
         self.tag = LogicArray(lambda: Logic(9), 1 << config.TAGE_IDX_WIDTH, name="tag")
         self.u = LogicArray(lambda: Logic(2), 1 << config.TAGE_IDX_WIDTH, name="u")
 
+        self.isolation_state = LogicArray(
+            lambda: Logic(2), 1 << config.TAGE_IDX_WIDTH, name="isolation_state"
+        )
+
         self.prev_idx = Logic(config.TAGE_IDX_WIDTH, "prev_idx")
         self.prev_hash_tag = Logic(9, "prev_hash_tag")
 
@@ -124,6 +128,8 @@ class top_(Module):
         self.correct_i = Logic(1, "correct_i")
         self.idx_i = Logic(32, "idx_i")
 
+        self.domain_i = Logic(2, "domain_i")
+
         # self.tage_prediction_o = Logic(33, "tage_prediction_o")
         self.prediction_o = Logic(1, "prediction_o")
 
@@ -148,6 +154,8 @@ class top(top_):
         self.eq(self.tp.allocs)
         self.eq(self.tp.dec_us)
 
+        self.eq(self.domain_i)
+
     def state(self):
         self.eq(self.tp.ghist)
         self.eq(self.tp.alt_ctr)
@@ -166,6 +174,8 @@ class top(top_):
             self.eq(tab.ctr)
             self.eq(tab.u)
             self.eq(tab.tag)
+
+            self.eq(tab.isolation_state)
 
             # Aux state
             self.eq(tab.u_clear_ctr)
