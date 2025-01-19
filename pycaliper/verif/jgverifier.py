@@ -9,7 +9,6 @@ from ..jginterface.jgoracle import (
     prove_out_bmc,
     loadscript,
     is_pass,
-    disable_assm,
     set_assm_induction_1t,
     set_assm_induction_2t,
     set_assm_bmc,
@@ -59,6 +58,7 @@ class JGVerifier2Trace(InvVerifier):
     def __init__(self, pyconfig: PYConfig) -> None:
         super().__init__(pyconfig)
         self.svagen = None
+        self.candidates = None
 
     def verify(self, module):
         """Verify two trace properties for the given module
@@ -79,7 +79,7 @@ class JGVerifier2Trace(InvVerifier):
 
         res = is_pass(prove_out_induction_2t(self.psc.context))
         res_str = "SAFE" if res else "UNSAFE"
-        logger.info(f"Two trace verification result: {res_str}")
+        logger.info("Two trace verification result: %s", res_str)
         return res
 
 
@@ -89,6 +89,7 @@ class JGVerifier1TraceBMC(InvVerifier):
     def __init__(self, pyconfig: PYConfig) -> None:
         super().__init__(pyconfig)
         self.svagen = None
+        self.candidates = None
 
     def verify(self, module):
         """Verify one trace properties for the given module
@@ -115,5 +116,5 @@ class JGVerifier1TraceBMC(InvVerifier):
                 for (i, res) in enumerate(results)
             ]
         )
-        logger.info(f"One trace verification result:\n\t{results_str}")
+        logger.info("One trace verification result:\n\t%s", results_str)
         return results

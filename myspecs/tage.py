@@ -101,6 +101,7 @@ class tage_table(Module):
 
         self.prev_idx = Logic(config.TAGE_IDX_WIDTH, "prev_idx")
         self.prev_hash_tag = Logic(9, "prev_hash_tag")
+        self.prev_domain = Logic(2, "prev_domain")
 
         self.u_clear_ctr = Logic(18, "u_clear_ctr")
         self.u_clear_col = Logic()
@@ -238,7 +239,7 @@ class boundary_spec(top_):
             self.inv(self.tp.c_T0.bht_targ_priv[i] < BOUNDARY)
         for tab in [self.tp.c_T1, self.tp.c_T2, self.tp.c_T3, self.tp.c_T4]:
             for i in range(1 << self.config.TAGE_IDX_WIDTH):
-                self.inv(~(tab.isolation_state[i] == PRIV) | (tab.targ[i] < BOUNDARY))
+                self.inv((~(tab.isolation_state[i] == PRIV)) | (tab.targ[i] < BOUNDARY))
 
             self.inv((~(tab.domain_i == PRIV)) | (tab.targ_i < BOUNDARY))
 

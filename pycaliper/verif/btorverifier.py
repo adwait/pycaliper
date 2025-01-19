@@ -3,6 +3,7 @@ import sys
 
 from ..btorinterface.pycbtorsymex import PYCBTORSymex
 from ..per import Module, Eq, CondEq
+from ..pycmanager import PYConfig
 
 from .invverifier import InvVerifier
 
@@ -10,7 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 class BTORVerifier2Trace(InvVerifier):
-    def __init__(self, slv: PYCBTORSymex):
+    def __init__(self, pyconfig: PYConfig, slv: PYCBTORSymex):
+        super().__init__(pyconfig)
         self.topmod = None
         self.slv = slv
 
@@ -65,3 +67,45 @@ class BTORVerifier2Trace(InvVerifier):
 
         # Perform verification
         return self.slv.inductive_two_safety()
+
+
+class BTORVerifier1Trace(InvVerifier):
+    def __init__(self, pyconfig: PYConfig, slv: PYCBTORSymex):
+        super().__init__(pyconfig)
+        self.topmod = None
+        self.slv = slv
+
+    def verify(self, module: Module) -> bool:
+        """
+        Perform verification for a single module of the following property:
+            input_eq && state_eq |-> ##1 output_eq && state_eq
+        """
+        # Instantiate the module
+        self.topmod: Module = module
+        self.topmod.instantiate()
+
+        if self.topmod._perholes or self.topmod._caholes:
+            logger.error(
+                "Holes not supported in a verifier, please use a synthesizer. Exiting."
+            )
+            sys.exit(1)
+
+        assms = []
+        assrts = []
+
+        # Generate the assumptions and assertions
+        for p in self.topmod._pycinternal__input_invs:
+            assms.append(p.expr)
+        for p in self.topmod._pycinternal__state_invs:
+            assms.append(p.expr)
+            assrts.append(p.expr)
+        for p in self.topmod._pycinternal__output_invs:
+            assrts.append(p.expr)
+
+        self.slv.add_assms(assms)
+        self.slv.add_assrts(assrts)
+
+        logger.debug(f"assms: %s, assrts: %s", assms, assrts)
+
+        # Perform verification
+        return self.slv.inductive_one_safety()

@@ -379,7 +379,7 @@ class CondEq(PER):
         self.logic = logic
 
     def __str__(self) -> str:
-        return f"condeq({self.cond}, {self.per})"
+        return f"condeq({self.cond}, {self.logic})"
 
     def get_sva(self, cpy1: str = "a", cpy2: str = "b") -> str:
         """Get the SVA representation of the conditional equality assertion."""
