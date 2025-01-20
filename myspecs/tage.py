@@ -65,8 +65,11 @@ class bht(Module):
             lambda: Logic(32), 1 << config.BHT_IDX_WIDTH, name="bht_targ_user"
         )
 
+        self.prev_domain = Logic(2, "prev_domain")
+
         # Outputs
         self.prediction_o = Logic(1, "prediction_o")
+        self.targ_o = Logic(32, "targ_o")
 
 
 class tage_table(Module):
@@ -241,7 +244,7 @@ class boundary_spec(top_):
             for i in range(1 << self.config.TAGE_IDX_WIDTH):
                 self.inv((~(tab.isolation_state[i] == PRIV)) | (tab.targ[i] < BOUNDARY))
 
-            self.inv((~(tab.domain_i == PRIV)) | (tab.targ_i < BOUNDARY))
+            # self.inv((~(tab.domain_i == PRIV)) | (tab.targ_i < BOUNDARY))
 
     def output(self):
         self.inv((~(self.tp.prev_domain == PRIV)) | (self.targ_o < BOUNDARY))

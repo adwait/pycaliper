@@ -10,7 +10,7 @@ module reg_en (
     output wire [31:0] q
 );
 
-    logic [31:0] q;
+    reg [31:0] q;
 
     always @(posedge clk) begin
         if (rst) begin
@@ -69,24 +69,24 @@ endmodule
 
 
 // Parent module with a miter with different inputs
-module miter (
-    input wire clk
-    , input wire rst
-    , output wire [31:0] qA
-    , output wire [31:0] qB
-);
+// module miter (
+//     input wire clk
+//     , input wire rst
+//     , output wire [31:0] qA
+//     , output wire [31:0] qB
+// );
 
 
-    regblock A (
-        .clk(clk)
-        , .rst(rst)
-        , .q(qA)
-    );
+//     regblock A (
+//         .clk(clk)
+//         , .rst(rst)
+//         , .q(qA)
+//     );
 
-    regblock B (
-        .clk(clk)
-        , .rst(rst)
-        , .q(qB)
-    );
+//     regblock B (
+//         .clk(clk)
+//         , .rst(rst)
+//         , .q(qB)
+//     );
 
-endmodule
+// endmodule

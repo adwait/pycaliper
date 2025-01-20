@@ -3,12 +3,14 @@ module fsm_counter (
     input  wire rst,
     input  wire start,
     input  wire stop,
-    output wire [2:0] counter
+    output logic [2:0] counter
     // output wire [1:0] state
 
+`ifndef VERILOG
     // dummy
     , input wire [31:0] d
     , output wire [31:0] q
+`endif
 );
 
     // 2-bit state encoding using SystemVerilog typedef enum
@@ -21,7 +23,7 @@ module fsm_counter (
 
     // Internal signals for state and counter
     state_t state;
-    logic [2:0] counter;
+    // logic [2:0] counter;
 
     // Synchronous state update and counter logic
     always @(posedge clk) begin
@@ -68,6 +70,7 @@ module fsm_counter (
         end
     end
 
+`ifndef VERILOG
     reg_en regm (
         .clk(clk)
         , .rst(rst)
@@ -75,10 +78,12 @@ module fsm_counter (
         , .d(d)
         , .q(q)
     );
+`endif
 
 
 endmodule
 
+`ifndef VERILOG
 module reg_en (
     input wire clk,
     input wire rst,
@@ -98,3 +103,4 @@ module reg_en (
     end
 
 endmodule
+`endif

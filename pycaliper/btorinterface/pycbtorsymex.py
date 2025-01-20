@@ -14,6 +14,7 @@ from btor2ex import BTORSolver, BTORSort, BTOR2Ex
 from pycaliper.per import Logic
 from pycaliper.per import Expr as PYCExpr
 import pycaliper.per.expr as pycexpr
+from pycaliper.pycmanager import PYConfig
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class PYCBTORSymex(BTOR2Ex):
 
     def __init__(
         self,
+        pyconfig: PYConfig,
         solver: BTORSolver,
         prog: list[prg.Instruction],
         cpy1: str = "a",
@@ -32,6 +34,7 @@ class PYCBTORSymex(BTOR2Ex):
     ):
         super().__init__(solver, prog)
 
+        self.pyconfig = pyconfig
         self.cpy1 = cpy1
         self.cpy2 = cpy2
 
@@ -111,7 +114,13 @@ class PYCBTORSymex(BTOR2Ex):
         logger.debug("Converting expression %s", expr)
 
         if isinstance(expr, Logic):
-            return frame[self.get_lid(expr)]
+            lid = self.get_lid(expr)
+            btor_expr = frame[lid]
+            logging.debug(
+                "Logic of interest: %s, lid: %s, btor_expr: %s", expr, lid, btor_expr
+            )
+            # self.dump_and_wait(btor_expr)
+            return btor_expr
 
         match expr:
             case pycexpr.OpApply(op=op, args=args):
@@ -212,7 +221,8 @@ class PYCBTORSymex(BTOR2Ex):
         cons = []
         for assm in self.inv_assms:
             logger.debug("Assm: %s", assm)
-            cons.append(self.convert_expr_to_btor2(assm, frame))
+            assm_expr = self.convert_expr_to_btor2(assm, frame)
+            cons.append(assm_expr)
         return cons
 
     def get_assrt_constraints(self, frame):
@@ -220,7 +230,8 @@ class PYCBTORSymex(BTOR2Ex):
         cons = []
         for assrt in self.inv_assrts:
             logger.debug("Assrt: %s", assrt)
-            cons.append(self.convert_expr_to_btor2(~assrt, frame))
+            assrt_expr = self.convert_expr_to_btor2(~assrt, frame)
+            cons.append(assrt_expr)
         return cons
 
     def get_hole_constraints(self, preframe, postframe):
@@ -337,8 +348,7 @@ class PYCBTORSymex(BTOR2Ex):
         return []
 
     def get_clock_constraints(self, states):
-        clk_name = "clk_i"
-        clk_lid = self.get_lid(clk_name)
+        clk_lid = self.get_lid(self.pyconfig.clk)
         cons = []
         start_value = 0
         for state in states:
@@ -350,39 +360,51 @@ class PYCBTORSymex(BTOR2Ex):
             start_value = 1 - start_value
         return cons
 
+    def dump_and_wait(self, assm):
+        assm.Dump()
+        assm.Dump("smt2")
+        # input("\nPRESS ENTER TO CONTINUE")
+
     def inductive_one_safety(self) -> bool:
         """Verifier for inductive one-trace property
 
         Returns:
             bool: is SAFE?
         """
-        # Unroll twice
-        self.execute()
-        # Check
-        self.execute()
+        k = self.pyconfig.k
+        all_assms = []
+        for i in range(k):
+            # Unroll 2k times
+            self.execute()
+            self.execute()
 
-        pre_state = self.state[0]
-        post_state = self.state[1]
+            # Constrain on falling transitions (intra-steps)
+            ind_state = self.state[2 * i]
+            # Collect all assumptions
+            all_assms.extend(self.get_assm_constraints(ind_state))
 
-        logger.debug("Pre state: %s", pre_state)
-        logger.debug("Post state: %s", post_state)
+        # Check final state (note that unrolling has one extra state)
+        final_state = self.state[2 * k - 1]
+        all_assrts = self.get_assrt_constraints(final_state)
 
-        assms = self.get_assm_constraints(pre_state)
-        assrts = self.get_assrt_constraints(post_state)
+        # Clocking behaviour
+        clk_assms = self.get_clock_constraints(self.state[:-1])
 
-        clk_assms = self.get_clock_constraints([pre_state, post_state])
+        for assrt_expr, assrt in zip(self.inv_assrts, all_assrts):
+            for assm in all_assms:
+                # self.dump_and_wait(assm)
+                self.slv.mk_assume(assm)
+            for clk_assm in clk_assms:
+                # self.dump_and_wait(clk_assm)
+                self.slv.mk_assume(clk_assm)
+            for assmdict in self.prgm_assms:
+                for _, assmi in assmdict.items():
+                    self.slv.mk_assume(assmi)
 
-        for _, assm in zip(self.inv_assms, assms):
-            self.slv.mk_assert(assm)
-        for clk_assm in clk_assms:
-            self.slv.mk_assert(clk_assm)
-        for assmdict in self.prgm_assms:
-            for _, assmi in assmdict.items():
-                self.slv.mk_assert(assmi)
-
-        for assrt_expr, assrt in zip(self.inv_assrts, assrts):
             self.slv.push()
+            # self.dump_and_wait(assrt)
             self.slv.mk_assert(assrt)
+            # self.dump_and_wait(assrt)
             result = self.slv.check_sat()
             logger.debug(
                 "For assertion %s, result %s", assrt_expr, "BUG" if result else "SAFE"
