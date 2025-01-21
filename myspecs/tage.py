@@ -142,11 +142,11 @@ class tage_predictor(Module):
         # info: should really be unneccessary
         self.dec_us = Logic(4)
 
-        self.c_T0 = bht("c_T0")
-        self.c_T1 = tage_table("c_T1")
-        self.c_T2 = tage_table("c_T2")
-        self.c_T3 = tage_table("c_T3")
-        self.c_T4 = tage_table("c_T4")
+        self.c_T0 = bht("c_T0", config=config)
+        self.c_T1 = tage_table("c_T1", config=config)
+        self.c_T2 = tage_table("c_T2", config=config)
+        self.c_T3 = tage_table("c_T3", config=config)
+        self.c_T4 = tage_table("c_T4", config=config)
 
         self.prev_domain = Logic(2, "prev_domain")
 
@@ -168,7 +168,7 @@ class top_(Module):
         self.prediction_o = Logic(1, "prediction_o")
         self.targ_o = Logic(32, "targ_o")
 
-        self.tp = tage_predictor("tp")
+        self.tp = tage_predictor("tp", config=config)
 
         self.config = config
 

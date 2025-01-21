@@ -1,4 +1,6 @@
-from btor2ex import BTOR2Ex, BoolectorSolver
+import sys
+import logging
+from btor2ex import BoolectorSolver
 from btor2ex.btor2ex.utils import parsewrapper
 
 import btoropt
@@ -8,31 +10,42 @@ from pycaliper.pycmanager import PYConfig
 from pycaliper.verif.btorverifier import BTORVerifier1Trace
 from pycaliper.btorinterface.pycbtorsymex import PYCBTORSymex
 
-from myspecs.tage import boundary_spec
-
-import logging
+from myspecs.tage import boundary_spec, tage_config
 
 # Log to a debug file with overwriting
 logging.basicConfig(filename="debug.log", level=logging.DEBUG, filemode="w")
 
 
-prgm = btoropt.parse(parsewrapper("designs/tage/tage_predictor.btor"))
-# prgm = btoropt.parse(parsewrapper("designs/tage/tage-predictor/btor/full_design.btor"))
+def test_main(bw):
+    BHTWIDTH = bw
+    TAGEWIDTH = BHTWIDTH - 2
 
-# engine = BTOR2Ex(BoolectorSolver(), prgm)
+    # prgm = btoropt.parse(parsewrapper("designs/tage/tage_predictor.btor"))
+    prgm = btoropt.parse(
+        parsewrapper(
+            f"designs/tage/tage-predictor/btor/full_design_{BHTWIDTH}_{TAGEWIDTH}.btor"
+        )
+    )
 
-# engine.execute()
+    pyconfig = PYConfig(clk="clk_i", k=2)
 
-pyconfig = PYConfig(clk="clk_i", k=2)
+    verifier = BTORVerifier1Trace(
+        pyconfig, PYCBTORSymex(pyconfig, BoolectorSolver(), prgm)
+    )
 
-verifier = BTORVerifier1Trace(pyconfig, PYCBTORSymex(pyconfig, BoolectorSolver(), prgm))
+    tage_conf = tage_config(BHT_IDX_WIDTH=BHTWIDTH, TAGE_IDX_WIDTH=TAGEWIDTH)
+
+    # print(tage_conf.BHT_IDX_WIDTH)
+
+    result = verifier.verify(boundary_spec(config=tage_conf))
+
+    print(
+        f"Verification result for {BHTWIDTH} {TAGEWIDTH}: ",
+        "PASS" if result else "FAIL",
+    )
 
 
-# verifier.slv.preprocess()
-
-# print(verifier.slv.names)
-
-result = verifier.verify(boundary_spec())
-
-input("Press Enter to continue...")
-print("Verification result: ", "PASS" if result else "FAIL")
+if __name__ == "__main__":
+    # Take the BHTWIDTH as an argument from the command line
+    bw = int(sys.argv[1])
+    test_main(bw)
