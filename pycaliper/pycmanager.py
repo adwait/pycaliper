@@ -146,6 +146,7 @@ class PYCManager:
 
     def save(self):
         if self.sdir != "":
+            logging.info(f"Saving to {self.sdir}")
             # Copy wdir to sdir
             os.system(f"cp -r {self.wdir}/. {self.sdir}/")
 

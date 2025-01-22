@@ -652,6 +652,16 @@ class CtrAlignHole(Hole):
         return f"self.ctralignhole({repr(self.ctr)}, {repr(self.sigs)})"
 
 
+class FSMHole(Hole):
+    def __init__(self, guardsigs: list[Logic], statesig: Logic):
+        super().__init__()
+        self.guardsigs = guardsigs
+        self.statesig = statesig
+
+    def __repr__(self) -> str:
+        return f"self.fsmhole({repr(self.guardsigs)}, {repr(self.statesig)})"
+
+
 def when(cond: Expr):
     """Create a Conditional equality PER generator. This returns a lambda that returns a CondEq object.
 
@@ -735,6 +745,8 @@ class Module:
         self._perholes: list[PERHole] = []
         # CtrAlign holes
         self._caholes: list[CtrAlignHole] = []
+        # FSM holes
+        self._fsmholes: list[FSMHole] = []
 
         self._auxmodules: dict[str, AuxModule] = {}
 
@@ -837,6 +849,18 @@ class Module:
             logger.error("Holes in input/output contexts currently not supported")
             sys.exit(1)
         self._caholes.append(CtrAlignHole(ctr, sigs))
+
+    def fsmhole(self, guardsigs: list[Logic], statesig: Logic):
+        """Creates an FSM hole.
+
+        Args:
+            guardsigs (list[Logic]): the guard signals for the FSM.
+            statesig (Logic): the state signal for the FSM.
+        """
+        if self._context == Context.INPUT or self._context == Context.OUTPUT:
+            logger.error("Holes in input/output contexts currently not supported")
+            sys.exit(1)
+        self._fsmholes.append(FSMHole(guardsigs, statesig))
 
     def inv(self, expr: Expr) -> None:
         """Add single trace invariants to the current context.

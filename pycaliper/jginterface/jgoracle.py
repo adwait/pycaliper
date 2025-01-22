@@ -108,6 +108,7 @@ def set_assm_induction_1t(taskcon: str, svacon: SVAContext):
     for assm in svacon.assms_bmc:
         disable_assm(taskcon, assm)
 
+
 def set_assm_induction_2t(taskcon: str, svacon: SVAContext):
     """Enable all assumptions required for 2 trace properties
 
@@ -124,6 +125,7 @@ def set_assm_induction_2t(taskcon: str, svacon: SVAContext):
     for assm in svacon.assms_bmc:
         disable_assm(taskcon, assm)
 
+
 def set_assm_bmc(taskcon: str, svacon: SVAContext):
     """Enable all assumptions required for 1 BMC trace properties"""
     # Disable all holes
@@ -135,7 +137,7 @@ def set_assm_bmc(taskcon: str, svacon: SVAContext):
         disable_assm(taskcon, assm)
     for assm in svacon.assms_bmc:
         enable_assm(taskcon, assm)
-        
+
 
 def prove_out_induction_1t(taskcon) -> ProofResult:
     return prove(taskcon, "output_inv")
@@ -144,11 +146,13 @@ def prove_out_induction_1t(taskcon) -> ProofResult:
 def prove_out_induction_2t(taskcon) -> ProofResult:
     return prove(taskcon, "output")
 
+
 def prove_out_bmc(taskcon, k: int) -> list[ProofResult]:
     results = []
     for i in range(k):
         results.append(prove(taskcon, f"step_{i}"))
     return results
+
 
 def loadscript(script):
     # Get pwd
@@ -159,13 +163,15 @@ def loadscript(script):
 
 
 def create_vcd_trace(prop, filepath):
+    traceoptcmd = "set_trace_optimization standard"
     windowcmd = f"visualize -violation -property {prop} -window visualize:trace"
     tracecmd = f"visualize -save -force -vcd {filepath} -window visualize:trace"
     logger.debug(f"Creating VCD trace for property: {prop}")
+    traceoptres = jgc.eval(traceoptcmd)
     windowres = jgc.eval(windowcmd)
     traceres = jgc.eval(tracecmd)
     logger.debug(
-        f"Creating VCD trace for property: {prop} returned {windowres}; {traceres}"
+        f"Creating VCD trace for property: {prop} returned {traceoptres}; {windowres}; {traceres}"
     )
     return
 

@@ -97,21 +97,27 @@ def autodetect_clock(vcdr: VCDVCD, conf: PYConfig) -> str:
     if conf.clk == "":
         # Try autodetecting the clock signal
         vcd_signals = vcdr.references_to_ids.keys()
+        exact_matches = [s for s in vcd_signals if any([s.endswith(c) for c in CLKS])]
         matches = [s for s in vcd_signals if any([c in s for c in CLKS])]
 
-        if len(matches) == 0:
+        if len(exact_matches) > 0:
+            if len(exact_matches) > 1:
+                logger.warn(
+                    f"Multiple exact clock signals detected: {exact_matches}, using the first one."
+                )
+            conf.clk = exact_matches[0]
+        elif len(matches) > 0:
+            if len(matches) > 1:
+                logger.warn(
+                    f"Multiple clock signals detected: {matches}, using the first one."
+                )
+            conf.clk = matches[0]
+        else:
             logger.error(
                 f"No clock signal auto detected in VCD file, using candidates {CLKS},"
                 + " please configure manually!"
             )
             sys.exit(1)
-        elif len(matches) > 1:
-            logger.debug(
-                f"Multiple clock signals detected, using the first one: {matches[0]}."
-            )
-        conf.clk = matches[0]
-    else:
-        conf.clk = f"{conf.ctx}.{conf.clk}"
     return conf.clk
 
 

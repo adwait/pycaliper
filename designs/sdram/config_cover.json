@@ -1,0 +1,12 @@
+{
+    "jasper" : {
+        "jdir"      : "designs/sdram",
+        "script"    : "sdram.tcl",
+        "pycfile"   : "sdram.pyc.sv",
+        "context"   : "<embedded>::miter"
+    },
+    "spec" : {
+        "pycspec" : "myspecs/sdram.sdram_controller_cover",
+        "k"        : 4
+    }
+}

@@ -13,6 +13,7 @@ from .per import (
     Hole,
     PERHole,
     CtrAlignHole,
+    FSMHole,
     SVFunc,
     AuxPort,
     AuxModule,
