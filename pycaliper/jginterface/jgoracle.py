@@ -183,3 +183,12 @@ def setjwd(jwd):
     res = jgc.eval(cmd)
     logger.debug(f"Changing Jasper working directory to {jwd} returned {res}")
     return res
+
+
+# def create_auxreg(name, width):
+#     connectcmd = f"connect -bind auxreg {name} -parameter WIDTH {width}"
+#     elabcmd = f"connect -elaborate"
+#     connectres = jgc.eval(connectcmd)
+#     elabres = jgc.eval(elabcmd)
+#     logger.debug(f"Creating auxilliary register {name} of width {width} returned {connectres}; {elabres}")
+#     return

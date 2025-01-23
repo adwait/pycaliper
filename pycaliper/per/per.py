@@ -753,6 +753,7 @@ class Module:
         self._fsmholes: list[FSMHole] = []
 
         self._auxmodules: dict[str, AuxModule] = {}
+        # self._auxregs = dict[str, AuxReg]
 
     # Invariant functions to be overloaded by descendant specification classes
     def input(self) -> None:
@@ -940,6 +941,16 @@ class Module:
         auxmoduleattrs = {}
         for attr in dir(self):
             obj = getattr(self, attr)
+            # if isinstance(obj, AuxReg):
+            #     if len(path.path) != 0:
+            #         logger.error(
+            #             "AuxReg can only be used at the top level of the elaboration."
+            #         )
+            #         sys.exit(1)
+            #     if obj.name == "":
+            #         obj.name = attr
+            #     auxregpath = path.add_level("auxreg").add_level(obj.name)
+            #     auxregs[obj.name] = obj.instantiate(auxregpath)
             if (
                 isinstance(obj, Logic)
                 or isinstance(obj, LogicArray)
@@ -1155,6 +1166,18 @@ class AuxModule(Module):
 """
         return aux_mod_decl
 
+
+# class AuxReg(Logic):
+
+#     def __init__(self, width = 1, name: str = "", root: str = None) -> None:
+#         super().__init__(width, name, root)
+#         self.elaborated = False
+
+#     def instantiate(self, path: Path) -> "AuxReg":
+#         logger.warn("AuxReg is only supported for JG and will be deprecated, use AuxModule instead!")
+#         self.path = path
+#         self.elaborated = True
+#         jgoracle.create_auxreg(self.name, self.width)
 
 # SVA-specific functions
 past = SVFunc("$past")
