@@ -91,11 +91,12 @@ class SVAGen:
         self.property_context = SVAContext()
 
     def _generate_decls_for_per(self, per: PER):
-        declbase = per.logic.get_hier_path_nonindex()
         declfull = per.logic.get_hier_path("_")
         if per.logic.is_arr_elem():
+            declbase = per.logic.get_hier_path_nonindex()
             declsize = f"[0:{per.logic.parent.size-1}]"
         else:
+            declbase = per.logic.get_hier_path("_")
             declsize = ""
         if isinstance(per, Eq):
             wirename = eq_sva(declfull)

@@ -69,10 +69,14 @@ class Path:
             slicestr = ""
         # Single bit
         elif self.slicelow == -1:
-            slicestr = f"[{self.slicehigh}]"
+            slicestr = f"[{self.slicehigh}]" if sep == "." else f"_{self.slicehigh}"
         # Proper slice
         else:
-            slicestr = f"[{self.slicehigh}:{self.slicelow}]"
+            slicestr = (
+                f"[{self.slicehigh}:{self.slicelow}]"
+                if sep == "."
+                else f"_{self.slicehigh}_{self.slicelow}"
+            )
         # Base signal string
         if len(self.path) == 0:
             basepath = []

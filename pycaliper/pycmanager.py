@@ -212,7 +212,7 @@ def create_module(specc, args):
     params = specc.get("params", {})
 
     parsed_conf = {}
-    for pair in args.params:
+    for pair in args.params.split(","):
         key, value = pair.split("=")
         parsed_conf[key] = int(value)
 
