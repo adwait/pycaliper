@@ -52,8 +52,8 @@ class Path:
 
     path: list[tuple[str, list]]
     # Slice of bitvector: low and high indices
-    slicelow: int = 0
-    slicehigh: int = 0
+    slicelow: int = -1
+    slicehigh: int = -1
 
     def get_hier_path(self, sep=".") -> str:
         """Get the hierarchical path as a string
@@ -65,7 +65,7 @@ class Path:
             str: Path string.
         """
         # No slicing
-        if self.slicelow == 0 and self.slicehigh == 0:
+        if self.slicelow == -1 and self.slicehigh == -1:
             slicestr = ""
         # Single bit
         elif self.slicelow == -1:

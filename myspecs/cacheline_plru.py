@@ -1,9 +1,12 @@
-from pycaliper.per import Module, Logic, LogicArray
-from pycaliper.per.per import unroll
+from pycaliper.per import Module, Logic, LogicArray, unroll
+from pycaliper.per.expr import *
 import math
 
-
 from enum import Enum
+
+
+def is_nonzero(x: Logic):
+    return OpApply(UnaryBitwiseOr(), [x])
 
 
 class TMode(Enum):
@@ -48,47 +51,74 @@ class cacheline_plru(Module):
         self.hit_way = Logic(self.NUM_WAYS_WIDTH)
 
     def input(self):
-        self.eq(self.reset)
-        # The cacheline receives the same kind of request
-        self.eq(self.os_req)
-        self.eq(self.user_req)
-        # Either it is a User request or an OS request
-        self.inv(~self.os_req | ~self.user_req)
-        self.inv(self.os_req | self.user_req)
-        # self.inv(self.user_req)
+        # Don't resets
+        self.inv(~self.reset)
 
-        # self.inv((~(self.os_req & self.attacker_domain)) | (~`attacker_domain))
+        # Only consider user requests
+        self.inv(~self.os_req & self.user_req)
 
-        # Attacker
-        if self.mode == TMode.ADV.value:
-            self.eq(self.hitmap)
-            self.eq(self.addr)
-        # User
-        else:
-            pass
+        self.inv(is_nonzero(self.policy_hitmap))
+        self.inv(is_nonzero(self.attacker_hitmap))
+        # self.inv(~(self.attacker_domain) | (self.hitmap == self.attacker_hitmap))
+        self.when(self.attacker_domain)(self.addr)
 
     def output(self):
-        if self.mode == TMode.ADV.value:
-            # self.eq(self.policy_hitmap(7, 1))
-            self.eq(self.hit)
-        else:
-            pass
+        self.when(self.attacker_domain)(self.hit)
 
     def state(self):
 
-        if self.mode == TMode.ADV.value:
-            self.eq(self.tags)
-            self.eq(self.metadata)
-            self.eq(self.valid)
-            self.eq(self.policy_hitmap)
+        # Attacker query
+        self.inv(~self.attacker_domain | (self.policy_hitmap == self.attacker_hitmap))
+        # Non-attacker query
+        self.inv(
+            self.attacker_domain
+            | OpApply(
+                UnaryBitwiseAnd(), [(~self.policy_hitmap) | (~self.attacker_hitmap)]
+            )
+        )
 
-            self.eq(self.plru_policy(7, 1))
-            self.eq(self.plru_mask(7, 1))
+        for i in range(self.NUM_WAYS):
+            self.when(self.attacker_hitmap(i))(self.policy_hitmap(i))
+            self.when(self.attacker_hitmap(i, i))(self.valid(i, i))
+            self.when(self.attacker_hitmap(i, i) & self.valid(i, i))(self.tags[i])
 
-            self.eq(self.victim_way)
-            self.eq(self.hit_way)
-        else:
-            pass
+        self.when(self.attacker_domain)(self.policy_hitmap)
+
+        self.when(OpApply(UnaryBitwiseOr(), [self.attacker_hitmap(1, 0)]))(
+            self.metadata(4, 4)
+        )
+        self.when(OpApply(UnaryBitwiseOr(), [self.attacker_hitmap(3, 2)]))(
+            self.metadata(5, 5)
+        )
+        self.when(OpApply(UnaryBitwiseOr(), [self.attacker_hitmap(5, 4)]))(
+            self.metadata(6, 6)
+        )
+        self.when(OpApply(UnaryBitwiseOr(), [self.attacker_hitmap(7, 6)]))(
+            self.metadata(7, 7)
+        )
+        self.when(OpApply(UnaryBitwiseOr(), [self.attacker_hitmap(3, 0)]))(
+            self.metadata(2, 2)
+        )
+        self.when(OpApply(UnaryBitwiseOr(), [self.attacker_hitmap(7, 4)]))(
+            self.metadata(3, 3)
+        )
+        self.when(OpApply(UnaryBitwiseOr(), [self.attacker_hitmap]))(
+            self.metadata(1, 1)
+        )
+
+        # if self.mode == TMode.ADV.value:
+        #     self.eq(self.tags)
+        #     self.eq(self.metadata)
+        #     self.eq(self.valid)
+        #     self.eq(self.policy_hitmap)
+
+        #     self.eq(self.plru_policy(7, 1))
+        #     self.eq(self.plru_mask(7, 1))
+
+        #     self.eq(self.victim_way)
+        #     self.eq(self.hit_way)
+        # else:
+        #     pass
 
     @unroll(3)
     def simstep(self, i):

@@ -17,6 +17,7 @@ from .per import (
     SVFunc,
     AuxPort,
     AuxModule,
+    unroll,
     rose,
     fell,
 )
