@@ -25,7 +25,7 @@ from typing import Callable
 import copy
 from dataclasses import dataclass
 
-from pycaliper.per.expr import Expr
+from pycaliper.per.expr import Expr, Const
 
 logger = logging.getLogger(__name__)
 
@@ -755,6 +755,8 @@ class Module:
         self._auxmodules: dict[str, AuxModule] = {}
         # self._auxregs = dict[str, AuxReg]
 
+        self._prev_signals = {}
+
     # Invariant functions to be overloaded by descendant specification classes
     def input(self) -> None:
         pass
@@ -830,6 +832,41 @@ class Module:
                     self._pycinternal__output.extend(ceqs)
 
         return _lambda
+
+    def prev(self, elem: Logic) -> Logic:
+        """Get the previous value of a signal.
+
+        Args:
+            elem (Logic): the signal to get the previous value of.
+
+        Returns:
+            Logic: the previous value of the signal.
+        """
+        # Check that signal in current specification
+        if (
+            not isinstance(elem, Logic)
+            or elem.name not in self._signals
+            or elem.is_arr_elem()
+        ):
+            logger.error(f"In prev: signal {elem.name} not found or is incompatible.")
+            sys.exit(1)
+        # Check if the previous signal has already been created
+        if elem.name in self._prev_signals:
+            return self._prev_signals[elem.name]
+        # Create a new signal with the same name and path
+        prevsig = copy.deepcopy(elem)
+        prevsig.name = f"prev_{elem.name}"
+        # Add the signal to the current specification
+        self._signals[prevsig.name] = prevsig
+        # Add to the previous signals dictionary
+        self._prev_signals[elem.name] = prevsig
+        return prevsig
+
+    def incr(self, x: Logic):
+        return (self.prev(x) + Const(1, x.width)) == x
+
+    def stable(self, x: Logic):
+        return self.prev(x) == x
 
     def eqhole(self, exprs: list[Expr]):
         """Creates an Eq (synthesis) hole.
