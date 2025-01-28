@@ -180,11 +180,7 @@ class MMRVerifier:
         ):
 
             for assm in (
-                input_a
-                + input_b
-                + state_a_pre
-                + state_b_pre
-                + state_a_post
+                state_a_post
                 + output_a
                 + ref_assms_pre
                 + ref_assms_post
