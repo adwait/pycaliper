@@ -7,6 +7,7 @@ import logging
 from ..pycmanager import PYConfig
 
 from ..per import Module, PERHole, Context
+from .iis_strategy import *
 
 from pycaliper.svagen import SVAGen
 from pycaliper.jginterface.jgoracle import (
@@ -26,7 +27,6 @@ logger = logging.getLogger(__name__)
 class SynthesisTree:
 
     counter = 0
-    MAXFUEL = 3
 
     def __init__(self, asrts=[], assms=[], parent=None, inherits=None):
         self.children: dict[str, SynthesisTree] = {}
@@ -37,7 +37,7 @@ class SynthesisTree:
         self.asrts: list[str] = list(asrts)
         self.assms: list[str] = assms + ([inherits] if inherits is not None else [])
 
-        self.fuel = SynthesisTree.MAXFUEL - len(self.assms) + len(self.asrts)
+        self.fuel = len(self.asrts) - len(self.assms)
 
         self.id = SynthesisTree.counter
         SynthesisTree.counter += 1
@@ -67,15 +67,32 @@ class SynthesisTree:
 
 
 class PERSynthesizer:
-    def __init__(self, psconf: PYConfig) -> None:
+    def __init__(
+        self,
+        psconf: PYConfig,
+        strategy: IISStrategy = SeqStrategy(),
+        fuelbudget: int = 3,
+        stepbudget: int = 10,
+    ) -> None:
         self.psc = psconf
         self.svagen = None
         self.candidates: dict[str, PERHole] = {}
 
-        self.depth = 0
-        self.minfuel = SynthesisTree.MAXFUEL
+        self.fuelbudget = fuelbudget
+        self.stepbudget = stepbudget
 
+        self.depth = 0
+        self.minfuel = 0
+        self.solvecalls = 0
         self.synstate: SynthesisTree = SynthesisTree()
+
+        self.strategy = strategy
+        self.state_invs = ""
+
+    def reset_state(self):
+        self.synstate = SynthesisTree()
+        self.depth = 0
+        self.minfuel = 0
 
     def _saturate(self):
         added = True
@@ -83,6 +100,7 @@ class PERSynthesizer:
             added = False
             for cand in self.candidates:
                 if cand not in self.synstate.asrts:
+                    self.solvecalls += 1
                     if is_pass(prove(self.psc.context, cand)):
                         added = True
                         self.synstate.add_asrt(cand)
@@ -128,12 +146,16 @@ class PERSynthesizer:
     def safe(self):
         if not self.synstate.checked:
             self.synstate.checked = True
+            self.solvecalls += 1
             return is_pass(prove_out_induction_2t(self.psc.context))
         return False
 
-    def _synthesize(self):
+    def _synthesize(self, candidate_order):
+        steps = 0
         while True:
+            steps += 1
             if self.synstate.is_self_inductive():
+                logger.debug(f"Synthesis node is self-inductive: {self.synstate.asrts}")
                 if self.safe():
                     # Done
                     logger.debug(
@@ -141,9 +163,10 @@ class PERSynthesizer:
                     )
                     return self.synstate.asrts
                 else:
+                    logger.debug(f"Synthesis node is not safe: {self.synstate.asrts}")
                     unexplored_cands = [
                         cand
-                        for cand in self.candidates
+                        for cand in candidate_order
                         if cand not in self.synstate.children
                         and cand not in self.synstate.assms
                     ]
@@ -151,48 +174,93 @@ class PERSynthesizer:
                         return None
                     else:
                         cand = unexplored_cands[0]
-                        self._dive(cand)
+                        if steps < self.stepbudget:
+                            self._dive(cand)
+                        else:
+                            return None
             else:
                 unexplored_cands = [
                     cand
-                    for cand in self.candidates
+                    for cand in candidate_order
                     if cand not in self.synstate.children
                     and cand not in self.synstate.assms
                 ]
-                # TODO: also use fuel
-                if unexplored_cands == []:
+                if unexplored_cands == [] or (self.synstate.fuel + self.fuelbudget < 0):
                     if not self._backtrack():
                         return None
                 else:
                     cand = unexplored_cands[0]
-                    self._dive(cand)
+                    if steps < self.stepbudget:
+                        self._dive(cand)
+                    else:
+                        return None
 
-    def synthesize(self, topmod: Module) -> Module:
+    def synthesize(self, topmod: Module, retries: int = 1) -> Module:
         # Create a new SVA generator
         self.svagen = SVAGen(topmod)
         self.svagen.create_pyc_specfile(k=self.psc.k, filename=self.psc.pycfile)
         self.candidates = self.svagen.holes
 
-        loadscript(self.psc.script)
+        logger.info(f"Using strategy: {self.strategy.__class__.__name__}")
+        self.state_invs = self.svagen.specs[self.svagen.topmod.path].state_spec_decl
+        # Strip each line and concatenate
+        self.state_invs = " ".join(
+            [line.strip() for line in self.state_invs.split("\n")]
+        )
 
-        # Enable and disable the right assumptions
-        set_assm_induction_2t(self.psc.context, self.svagen.property_context)
+        candidate_orders = []
 
-        invs = self._synthesize()
+        for i in range(retries):
+            # Load the script
+            loadscript(self.psc.script)
+            # Enable and disable the right assumptions
+            set_assm_induction_2t(self.psc.context, self.svagen.property_context)
+
+            candidate_order = self.strategy.get_candidate_order(
+                list(self.candidates.keys()),
+                ctx=self.state_invs,
+                prev_attempts=candidate_orders,
+            )
+            logger.debug(f"Got candidate order: {candidate_order}")
+            candidate_orders.append(candidate_order)
+            self.reset_state()
+            invs = self._synthesize(candidate_order)
+
+            if invs is None:
+                # Synthesis failed
+                logger.info(
+                    f"Invariant synthesis failed at attempt: {i}. Retrying synthesis."
+                )
+
+            else:
+                logger.info(
+                    f"Synthesized invariants: {invs} at depth: {self.depth} and minimum fuel: {self.fuelbudget + self.minfuel}"
+                )
+
+                logger.info(self.strategy.get_stats())
+
+                # Disable all eq holes
+                for c in topmod._perholes:
+                    c.deactivate()
+                for inv in invs:
+                    topmod._eq(self.candidates[inv], Context.STATE)
+
+                break
 
         if invs is None:
-            # Synthesis failed
-            logger.warn("Invariant synthesis failed.")
-
+            logger.error(
+                f"Synthesis failed after {retries} attempts with {self.solvecalls} solve calls and {SynthesisTree.counter} steps."
+            )
+            with open("persyn.log", "a") as f:
+                f.write(
+                    f"{self.strategy.__class__.__name__},{self.solvecalls},{SynthesisTree.counter},fail\n"
+                )
         else:
             logger.info(
-                f"Synthesized invariants: {invs} at depth: {self.depth} and minimum fuel: {self.minfuel}"
+                f"Synthesis complete. Synthesized invariants: {invs} in {i+1} attempts with {self.solvecalls} solve calls and {SynthesisTree.counter} steps."
             )
-
-            # Disable all eq holes
-            for c in topmod._perholes:
-                c.deactivate()
-            for inv in invs:
-                topmod._eq(self.candidates[inv], Context.STATE)
-
+            with open("persyn.log", "a") as f:
+                f.write(
+                    f"{self.strategy.__class__.__name__},{self.solvecalls},{SynthesisTree.counter},success\n"
+                )
         return topmod

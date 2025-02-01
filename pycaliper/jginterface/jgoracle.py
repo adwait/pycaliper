@@ -121,7 +121,7 @@ def set_assm_induction_2t(taskcon: str, svacon: SVAContext):
     for assm in svacon.assms_2trace:
         enable_assm(taskcon, assm)
     for assm in svacon.assms_1trace:
-        disable_assm(taskcon, assm)
+        enable_assm(taskcon, assm)
     for assm in svacon.assms_bmc:
         disable_assm(taskcon, assm)
 

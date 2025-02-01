@@ -6,7 +6,7 @@ import sys
 import logging
 from pydantic import BaseModel
 
-from .per import Module, Eq, Path, Context, PER, Inv, PERHole, AuxModule
+from .per import Module, Eq, CondEq, Path, Context, PER, Inv, PERHole, AuxModule
 from .propns import *
 
 logger = logging.getLogger(__name__)
@@ -107,6 +107,22 @@ class SVAGen:
             declname = condeq_sva(declbase)
         return (wirename, declname, declsize)
 
+    def _get_id_for_per_hole(self, per: PER):
+        if isinstance(per, Eq):
+            return eq_sva(f"hole_{per.logic.get_hier_path('_')}")
+        elif isinstance(per, CondEq):
+            return condeq_sva(f"hole_{str(per.cond)}_{per.logic.get_hier_path('_')}")
+
+    def _generate_decls_for_per_hole(self, per: PER):
+        if per.logic.is_arr_elem():
+            logger.error(
+                f"Array elements not supported in holes: {per.logic.get_hier_path()}"
+            )
+            sys.exit(1)
+        wirename = self._get_id_for_per_hole(per)
+        declsize = ""
+        return (wirename, wirename, declsize)
+
     def _gen_1t_single(self, mod: Module, invs: list[Inv], ctx: Context, a: str = "a"):
         inv_exprs = []
         for inv in invs:
@@ -180,7 +196,9 @@ class SVAGen:
 
         for hole in mod._perholes:
             if hole.active:
-                (wirename, declname, declsize) = self._generate_decls_for_per(hole.per)
+                (wirename, declname, declsize) = self._generate_decls_for_per_hole(
+                    hole.per
+                )
                 exprname = hole.per.get_sva(a, b)
                 assigns[wirename] = f"assign {wirename} = ({exprname});"
                 decls[declname] = f"logic {declname} {declsize};"
@@ -268,19 +286,32 @@ class SVAGen:
             if hole.active:
                 if isinstance(hole.per, Eq):
                     assm_prop = (
-                        f"A_{eq_sva(hole.per.logic.get_hier_path_flatindex())} : assume property\n"
-                        + f"\t(!({STEP_SIGNAL}) |-> {eq_sva(hole.per.logic.get_hier_path('_'))});"
+                        f"A_{self._get_id_for_per_hole(hole.per)} : assume property\n"
+                        + f"\t(!({STEP_SIGNAL}) |-> {self._get_id_for_per_hole(hole.per)});"
                     )
                     asrt_prop = (
-                        f"P_{eq_sva(hole.per.logic.get_hier_path_flatindex())} : assert property\n"
-                        + f"\t(({STEP_SIGNAL}) |-> {eq_sva(hole.per.logic.get_hier_path('_'))});"
+                        f"P_{self._get_id_for_per_hole(hole.per)} : assert property\n"
+                        + f"\t(({STEP_SIGNAL}) |-> {self._get_id_for_per_hole(hole.per)});"
                     )
-                    self.holes[
-                        eq_sva(hole.per.logic.get_hier_path_flatindex())
-                    ] = hole.per.logic
+                    self.holes[self._get_id_for_per_hole(hole.per)] = hole.per.logic
                     properties.extend([assm_prop, asrt_prop])
                     self.property_context.holes.append(
-                        f"{eq_sva(hole.per.logic.get_hier_path_flatindex())}"
+                        self._get_id_for_per_hole(hole.per)
+                    )
+
+                elif isinstance(hole.per, CondEq):
+                    assm_prop = (
+                        f"A_{self._get_id_for_per_hole(hole.per)} : assume property\n"
+                        + f"\t(!({STEP_SIGNAL}) |-> {self._get_id_for_per_hole(hole.per)});"
+                    )
+                    asrt_prop = (
+                        f"P_{self._get_id_for_per_hole(hole.per)} : assert property\n"
+                        + f"\t(({STEP_SIGNAL}) |-> {self._get_id_for_per_hole(hole.per)});"
+                    )
+                    self.holes[self._get_id_for_per_hole(hole.per)] = hole.per.logic
+                    properties.extend([assm_prop, asrt_prop])
+                    self.property_context.holes.append(
+                        self._get_id_for_per_hole(hole.per)
                     )
 
         return properties, self._generate_decls(self.topmod, a, b)

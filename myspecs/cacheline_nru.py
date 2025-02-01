@@ -21,6 +21,7 @@ class cacheline_nru(Module):
         self.NUM_WAYS = kwargs.get("NUM_WAYS", 8)
         self.NUM_WAYS_WIDTH = int(math.log(self.NUM_WAYS, 2))
         self.mode = int(kwargs.get("MODE"))
+        self.k = kwargs.get("k", 2)
         # Reset input
         self.reset = Logic()
 
@@ -82,7 +83,26 @@ class cacheline_nru(Module):
             self.when(self.attacker_hitmap(i))(self.policy_hitmap(i))
             self.when(self.attacker_hitmap(i))(self.valid(i, i))
             self.when(self.attacker_hitmap(i) & self.valid(i, i))(self.tags[i])
+
+        for i in range(self.NUM_WAYS - self.k):
             self.when(self.attacker_hitmap(i))(self.metadata(i))
+
+        for i in range(self.NUM_WAYS - self.k, self.NUM_WAYS):
+            self.condeqhole(
+                self.attacker_hitmap(i),
+                [
+                    self.metadata(j)
+                    for j in range(self.NUM_WAYS - self.k, self.NUM_WAYS)
+                ],
+            )
+
+        # for i in range(5, 8):
+        #     for j in range(5, 8):
+        #         self.when(self.attacker_hitmap(i))(self.metadata(j))
+        # self.when(self.attacker_hitmap(i))(self.policy_hitmap(i))
+        # self.condeqhole(self.attacker_hitmap(2),
+        #                 # [self.metadata(i) for i in range(self.NUM_WAYS)]
+        #                 [self.metadata(i) for i in [1, 2]])
 
     @unroll(3)
     def simstep(self, i):

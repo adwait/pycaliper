@@ -206,15 +206,25 @@ CONFIG_SCHEMA = {
 }
 
 
+def get_specmodname(specmod):
+    if "/" in specmod:
+        module_name = specmod.rsplit("/", 1)[1]
+        if "." in module_name:
+            module_name = module_name.rsplit(".", 1)[0]
+        return module_name
+    return specmod
+
+
 def create_module(specc, args):
     """Dynamically import the spec module and create an instance of it."""
     specmod: str = specc["pycspec"]
     params = specc.get("params", {})
 
     parsed_conf = {}
-    for pair in args.params.split(","):
-        key, value = pair.split("=")
-        parsed_conf[key] = int(value)
+    if args.params:
+        for pair in args.params.split(","):
+            key, value = pair.split("=")
+            parsed_conf[key] = int(value)
 
     params.update(parsed_conf)
 
@@ -285,7 +295,7 @@ def get_pyconfig(config, args: PYCArgs) -> PYConfig:
         context=jasperc["context"],
         pycfile=f'{jasperc["jdir"]}/{jasperc["pycfile"]}',
         # Spec config
-        pycspec=specc["pycspec"],
+        pycspec=get_specmodname(specc["pycspec"]),
         k=specc["k"],
         onetrace=args.onetrace,
         # Tracing configuration

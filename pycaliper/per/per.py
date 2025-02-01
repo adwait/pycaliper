@@ -232,7 +232,7 @@ class Logic(Expr, TypedElem):
         return len(self.path.path[-1][1]) > 0
 
     def __str__(self) -> str:
-        return self.get_hier_path()
+        return self.get_hier_path("_")
 
     def __repr__(self):
         return f"self.{self.get_hier_path()}"
@@ -327,8 +327,25 @@ class LogicArray(TypedElem):
         return self.logic[index - self.base]
 
 
+class Prop:
+    """Property class"""
+
+    def __init__(self):
+        pass
+
+    def get_sva(self, pref: str = "a"):
+        raise NotImplementedError(
+            "Method not implemented for abstract base Prop class."
+        )
+
+    def __repr__(self):
+        raise NotImplementedError(
+            "Method not implemented for abstract base Prop class."
+        )
+
+
 # Partial equivalence relation
-class PER:
+class PER(Prop):
     """Partial Equivalence Relation (PER) base class"""
 
     def __init__(self) -> None:
@@ -396,7 +413,7 @@ class CondEq(PER):
         return f"self.when({repr(self.cond)})({repr(self.logic)})"
 
 
-class Inv:
+class Inv(Prop):
     """Invariant class"""
 
     def __init__(self, expr: Expr):
@@ -643,7 +660,23 @@ class PERHole(Hole):
         self.ctx = ctx
 
     def __repr__(self):
-        return f"self.eqhole([{repr(self.per.logic)}])"
+        if isinstance(self.per, Eq):
+            return f"self.eqhole([{repr(self.per.logic)}])"
+        elif isinstance(self.per, CondEq):
+            return f"self.condeqhole({repr(self.per.cond)}, [{repr(self.per.logic)}])"
+
+
+class CondEqHole(Hole):
+    """A synthesis hole for a conditional equality PER"""
+
+    def __init__(self, cond: Expr, per: PER, ctx: Context):
+        super().__init__()
+        self.cond = cond
+        self.per = per
+        self.ctx = ctx
+
+    def __repr__(self):
+        return f"self.when({repr(self.cond)})({repr(self.per)})"
 
 
 class CtrAlignHole(Hole):
@@ -747,6 +780,8 @@ class Module:
         self._pycinternal__simstep: SimulationStep = SimulationStep()
         # PER holes
         self._perholes: list[PERHole] = []
+        # CondEq holes
+        # self._condeqholes: list[CondEqHole] = []
         # CtrAlign holes
         self._caholes: list[CtrAlignHole] = []
         # FSM holes
@@ -879,6 +914,19 @@ class Module:
             sys.exit(1)
         for expr in exprs:
             self._perholes.append(PERHole(Eq(expr), self._context))
+
+    def condeqhole(self, cond: Expr, exprs: list[Expr]):
+        """Creates a Conditional Eq (synthesis) hole.
+
+        Args:
+            cond (Expr): the condition for the Eq.
+            exprs (list[Expr]): the list of expressions to consider as candidates for filling this hole.
+        """
+        if self._context == Context.INPUT or self._context == Context.OUTPUT:
+            logger.error("Holes in input/output contexts currently not supported")
+            sys.exit(1)
+        for expr in exprs:
+            self._perholes.append(PERHole(CondEq(cond, expr), self._context))
 
     def ctralignhole(self, ctr: Logic, sigs: list[Logic]):
         """Creates a Control Alignment hole.
