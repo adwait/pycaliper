@@ -1,9 +1,10 @@
-from pycaliper.per import SpecModule, Logic, Const
+from pycaliper.per import *
 
 
 class reg_en(SpecModule):
     def __init__(self, width=32):
         super().__init__()
+        self.clk = Clock()
         self.width = width
         self.rst = Logic()
         self.en = Logic()

@@ -73,8 +73,6 @@ class PYConfig(BaseModel):
     # What is the property to generate traces?
     tgprop: str = ""
     # VCD trace configuration elements
-    # Clock signal name
-    clk: Path = Path([])
     # Simulation top level module in overall hierarchy
     ctx: str = ""
 
@@ -196,8 +194,6 @@ CONFIG_SCHEMA = {
                 "tdir": {"type": "string"},
                 # What is the property used for trace generation
                 "tgprop": {"type": "string"},
-                # Clock signal name
-                "clk": {"type": "string"},
                 # What is the hierarchical top module
                 "topmod": {"type": "string"},
             },
@@ -311,7 +307,6 @@ def get_pyconfig(args: PYCArgs) -> PYConfig:
         # Location where traces are provided
         tdir=tracec.get("tdir", ""),
         tgprop=tracec.get("tgprop", ""),
-        clk=get_path_from_hierarchical_str(tracec.get("clk", "")),
         ctx=tracec.get("topmod", ""),
     )
 

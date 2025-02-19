@@ -7,7 +7,7 @@ DONE = Const(3, 2)
 class demo(SpecModule):
     def __init__(self, name="", **kwargs) -> None:
         super().__init__(name, **kwargs)
-        self.clk = Logic(1, "clk")
+        self.clk = Clock(1)
         self.rst = Logic(1, "rst")
 
         # Inputs

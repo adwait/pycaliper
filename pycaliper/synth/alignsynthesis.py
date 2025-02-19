@@ -80,15 +80,17 @@ class AlignSynthesizer:
 
         return True
 
-    def _synthesize_cahole(self, cahole: CtrAlignHole):
+    def _synthesize_cahole(self, mod: SpecModule, cahole: CtrAlignHole):
         logger.debug(f"Attempting synthesis for hole {cahole}")
 
         vcdfile = self._sample_tracepath()
         vcdobj: VCDVCD = VCDVCD(vcdfile)
 
         intsigs = [cahole.ctr] + cahole.sigs
+
+        clk = mod.get_clk().get_hier_path()
         # TODO: range should be a parameter
-        trace = get_subtrace(vcdobj, intsigs, range(0, 16), self.pyconf)
+        trace = get_subtrace(vcdobj, intsigs, range(0, 16), clk, self.pyconf.ctx)
 
         for s in cahole.sigs:
             zddsp = ZDDLUTSynthProgram(cahole.ctr, s)
@@ -133,6 +135,6 @@ class AlignSynthesizer:
             sys.exit(1)
 
         for h in self.topmod._pycinternal__caholes:
-            self._synthesize_cahole(h)
+            self._synthesize_cahole(self.topmod, h)
 
         return self.topmod

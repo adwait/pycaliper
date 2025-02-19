@@ -1,6 +1,7 @@
 from .per import (
     TypedElem,
     Logic,
+    Clock,
     LogicArray,
     Struct,
     Group,

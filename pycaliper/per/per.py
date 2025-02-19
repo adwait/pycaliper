@@ -273,6 +273,11 @@ class Logic(Expr, TypedElem):
         return hash(self.get_hier_path())
 
 
+class Clock(Logic):
+    def __init__(self, name: str = "") -> None:
+        super().__init__(1, name, None)
+
+
 class LogicArray(TypedElem):
     """An array of logic signals"""
 
@@ -849,6 +854,8 @@ class SpecModule:
         self._pycinternal__auxmodules: dict[str, AuxModule] = {}
         # self._auxregs = dict[str, AuxReg]
         self._pycinternal__prev_signals = {}
+        # Clock signal
+        self._pycinternal__clk: (Clock | None) = None
 
     # Invariant functions to be overloaded by descendant specification classes
     def input(self) -> None:
@@ -1097,17 +1104,18 @@ class SpecModule:
         auxmoduleattrs = {}
         for attr in dir(self):
             obj = getattr(self, attr)
-            # if isinstance(obj, AuxReg):
-            #     if len(path.path) != 0:
-            #         logger.error(
-            #             "AuxReg can only be used at the top level of the elaboration."
-            #         )
-            #         sys.exit(1)
-            #     if obj.name == "":
-            #         obj.name = attr
-            #     auxregpath = path.add_level("auxreg").add_level(obj.name)
-            #     auxregs[obj.name] = obj.instantiate(auxregpath)
-            if (
+            if isinstance(obj, Clock):
+                # Make sure in top path
+                if path != Path([]):
+                    logger.warn("Clock signals must be in top level, skipping")
+                    continue
+                if self._pycinternal__clk is not None:
+                    logger.warn("Multiple clock signals defined, skipping")
+                    continue
+                if obj.name == "":
+                    obj.name = attr
+                self._pycinternal__clk = obj.instantiate(path.add_level(obj.name))
+            elif (
                 isinstance(obj, Logic)
                 or isinstance(obj, LogicArray)
                 or isinstance(obj, Struct)
@@ -1154,8 +1162,6 @@ class SpecModule:
         # Run through simulation steps
         self._pycinternal__context = Context.UNROLL
         # Handle all unrolling schedules
-        #! removed: self.simstep()
-        # TODO: maybe this needs to be self.__class__
         for i, fn in inspect.getmembers(self, predicate=inspect.ismethod):
             if hasattr(fn, "_pycinternal__is_unroll_schedule"):
                 if hasattr(fn, "_pycinternal__unroll_depth"):
@@ -1196,6 +1202,9 @@ class SpecModule:
     def get_hier_path(self, sep: str = "."):
         """Call inner get_hier_path method."""
         return self.path.get_hier_path(sep)
+
+    def get_clk(self) -> Clock:
+        return self._pycinternal__clk
 
     def sprint(self):
         s = ""
@@ -1250,6 +1259,9 @@ class SpecModule:
             "\tdef __init__(self, name = '', **kwargs):",
             f"\t\tsuper().__init__(name, kwargs)",
         ]
+        inits.append(
+            f"\t\tself.{nonreserved_or_fresh(self._pycinternal__clk.name)} = Clock({self._pycinternal__clk.name})"
+        )
         for s, t in self._pycinternal__signals.items():
             if isinstance(t, Logic):
                 inits.append(

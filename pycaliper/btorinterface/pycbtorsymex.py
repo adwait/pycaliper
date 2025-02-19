@@ -14,7 +14,6 @@ from btor2ex import BTORSolver, BTORSort, BTOR2Ex
 from pycaliper.per import Logic, Path
 from pycaliper.per import Expr as PYCExpr
 import pycaliper.per.expr as pycexpr
-from pycaliper.pycmanager import PYConfig
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +25,6 @@ class PYCBTORSymex(BTOR2Ex):
 
     def __init__(
         self,
-        pyconfig: PYConfig,
         solver: BTORSolver,
         prog: list[prg.Instruction],
         cpy1: str = "a",
@@ -34,7 +32,6 @@ class PYCBTORSymex(BTOR2Ex):
     ):
         super().__init__(solver, prog)
 
-        self.pyconfig = pyconfig
         self.cpy1 = cpy1
         self.cpy2 = cpy2
 
@@ -49,26 +46,6 @@ class PYCBTORSymex(BTOR2Ex):
         # One trace invariants
         self.inv_assms: list[PYCExpr] = []
         self.inv_assrts: list[PYCExpr] = []
-
-        self.pycexpr_to_btor2_opmap = {
-            pycexpr.LogicalAnd: "and",
-            pycexpr.LogicalOr: "or",
-            pycexpr.BinaryXor: "xor",
-            pycexpr.UnaryLogicalNot: "not",
-            pycexpr.LogicalShiftLeft: "sll",
-            pycexpr.LogicalShiftRight: "srl",
-            pycexpr.Add: "add",
-            pycexpr.Sub: "sub",
-            pycexpr.LessThan: "slt",
-            pycexpr.LessThanEqual: "slte",
-            pycexpr.GreaterThan: "sgt",
-            pycexpr.GreaterThanEqual: "sgte",
-            pycexpr.Equality: "eq",
-            pycexpr.Inequality: "neq",
-            pycexpr.BinaryAnd: "and",
-            pycexpr.BinaryOr: "or",
-            pycexpr.UnaryBitwiseNot: "not",
-        }
 
     def add_eq_assms(self, assms: list[PYCExpr]):
         """Add two trace equality assumptions"""

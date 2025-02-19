@@ -15,7 +15,7 @@ class parity(AuxModule):
 class counter(SpecModule):
     def __init__(self, name="", **kwargs) -> None:
         super().__init__(name, **kwargs)
-        self.clk = Logic(1, "clk")
+        self.clk = Clock()
         self.rst = Logic(1, "rst")
         self.counter = Logic(8, "counter")
 

@@ -17,7 +17,6 @@ from collections.abc import MutableMapping
 from vcdvcd import VCDVCD
 
 from .per.per import Logic
-from .pycmanager import PYConfig
 
 
 logger = logging.getLogger(__name__)
@@ -83,7 +82,7 @@ def signalstr_to_vcdid(sig: str):
         return (sig, -1, -1)
 
 
-def autodetect_clock(vcdr: VCDVCD, conf: PYConfig) -> str:
+def autodetect_clock(vcdr: VCDVCD) -> str:
     """Find the clock signal in the VCD file
 
     Args:
@@ -94,34 +93,32 @@ def autodetect_clock(vcdr: VCDVCD, conf: PYConfig) -> str:
     """
     CLKS = ["clk", "clock"]
 
-    if conf.clk == "":
-        # Try autodetecting the clock signal
-        vcd_signals = vcdr.references_to_ids.keys()
-        exact_matches = [s for s in vcd_signals if any([s.endswith(c) for c in CLKS])]
-        matches = [s for s in vcd_signals if any([c in s for c in CLKS])]
+    # Try autodetecting the clock signal
+    vcd_signals = vcdr.references_to_ids.keys()
+    exact_matches = [s for s in vcd_signals if any([s.endswith(c) for c in CLKS])]
+    matches = [s for s in vcd_signals if any([c in s for c in CLKS])]
 
-        if len(exact_matches) > 0:
-            if len(exact_matches) > 1:
-                logger.warn(
-                    f"Multiple exact clock signals detected: {exact_matches}, using the first one."
-                )
-            conf.clk = exact_matches[0]
-        elif len(matches) > 0:
-            if len(matches) > 1:
-                logger.warn(
-                    f"Multiple clock signals detected: {matches}, using the first one."
-                )
-            conf.clk = matches[0]
-        else:
-            logger.error(
-                f"No clock signal auto detected in VCD file, using candidates {CLKS},"
-                + " please configure manually!"
+    if len(exact_matches) > 0:
+        if len(exact_matches) > 1:
+            logger.warn(
+                f"Multiple exact clock signals detected: {exact_matches}, using the first one."
             )
-            sys.exit(1)
-    return conf.clk
+        return exact_matches[0]
+    elif len(matches) > 0:
+        if len(matches) > 1:
+            logger.warn(
+                f"Multiple clock signals detected: {matches}, using the first one."
+            )
+        return matches[0]
+    else:
+        logger.warn(
+            f"No clock signal auto detected in VCD file, using candidates {CLKS},"
+            + " please configure manually!"
+        )
+        return None
 
 
-def autodetect_clockdelta(vcdr: VCDVCD, conf: PYConfig) -> int:
+def autodetect_clockdelta(vcdr: VCDVCD, clk: str) -> int:
     """Find the clock signal delta in the VCD file
 
     Args:
@@ -130,8 +127,6 @@ def autodetect_clockdelta(vcdr: VCDVCD, conf: PYConfig) -> int:
     Returns:
         int: clock timedelta
     """
-
-    clk = autodetect_clock(vcdr, conf)
 
     # Find frequency
     clkref = vcdr.references_to_ids[clk]
@@ -149,7 +144,7 @@ def autodetect_clockdelta(vcdr: VCDVCD, conf: PYConfig) -> int:
 
 
 def get_subtrace(
-    vcdr: VCDVCD, sigs: list[Logic], rng: range, conf: PYConfig
+    vcdr: VCDVCD, sigs: list[Logic], rng: range, clk: str, ctx: str = ""
 ) -> list[Assignment]:
     """Extract the signals from the vcd trace between the start_cyc and end_cyc (both inclusive)
         This is done only for signals that have counterparts in the design (CSIGs and DSIGs)
@@ -164,7 +159,8 @@ def get_subtrace(
         list[Assignment]: a list of Assignment objects, one for each step in rng
     """
     # Taken from `aul` and simplified by dropping maps/unconstrained signals
-    timedelta = autodetect_clockdelta(vcdr, conf)
+    clk_w_ctx = ctx + "." + clk if ctx != "" else clk
+    timedelta = autodetect_clockdelta(vcdr, clk)
 
     vcd_signals = vcdr.references_to_ids.keys()
 
@@ -173,7 +169,7 @@ def get_subtrace(
         itime = i * timedelta
         frame = Assignment()
         for sig in sigs:
-            vcdid = signalstr_to_vcdid(sig.get_sva(conf.ctx))
+            vcdid = signalstr_to_vcdid(sig.get_sva(ctx))
             # Either vcdid exactly VCD signal name or there is an indexing component
             matches = [
                 s for s in vcd_signals if ((vcdid[0] + "[" in s) or (vcdid[0] == s))

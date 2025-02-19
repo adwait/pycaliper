@@ -153,7 +153,7 @@ class tage_predictor(SpecModule):
 class top_(SpecModule):
     def __init__(self, name="", config: tage_config = tage_config(), **kwargs) -> None:
         super().__init__(name, **kwargs)
-
+        self.clk_i = Clock()
         self.rst_i = Logic(1, "rst_i")
 
         self.br_result_i = Logic(1, "br_result_i")

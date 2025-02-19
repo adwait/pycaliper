@@ -27,7 +27,7 @@ def test_main(bw):
         )
     )
 
-    pyconfig = PYConfig(clk=get_path_from_hierarchical_str("clk_i"))
+    pyconfig = PYConfig()
 
     verifier = BTORVerifier1Trace(
         pyconfig, PYCBTORSymex(pyconfig, BoolectorSolver(), prgm)
