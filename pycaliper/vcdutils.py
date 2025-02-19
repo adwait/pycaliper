@@ -160,7 +160,7 @@ def get_subtrace(
     """
     # Taken from `aul` and simplified by dropping maps/unconstrained signals
     clk_w_ctx = ctx + "." + clk if ctx != "" else clk
-    timedelta = autodetect_clockdelta(vcdr, clk)
+    timedelta = autodetect_clockdelta(vcdr, clk_w_ctx)
 
     vcd_signals = vcdr.references_to_ids.keys()
 
