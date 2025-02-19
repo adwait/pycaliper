@@ -1,4 +1,4 @@
-from pycaliper.per import Module, Logic, LogicArray, unroll
+from pycaliper.per import SpecModule, Logic, LogicArray, unroll, kinduct
 from pycaliper.per.expr import *
 import math
 
@@ -14,7 +14,7 @@ class TMode(Enum):
     VIC = 1
 
 
-class cacheline_nru(Module):
+class cacheline_nru(SpecModule):
     def __init__(self, **kwargs):
         super().__init__()
 
@@ -67,6 +67,7 @@ class cacheline_nru(Module):
         # self.when(self.attacker_domain)(self.hit)
         pass
 
+    @kinduct(2)
     def state(self):
 
         # Attacker query

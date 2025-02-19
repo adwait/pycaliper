@@ -4,9 +4,5 @@
         "script"    : "tage.tcl",
         "pycfile"   : "tage.pyc.sv",
         "context"   : "<embedded>::miter"
-    },
-    "spec" : {
-        "pycspec" : "myspecs/tage.boundary_spec",
-        "k"        : 2
     }
 }

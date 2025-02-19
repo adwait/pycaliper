@@ -4,8 +4,5 @@
         "script"    : "demo.tcl",
         "pycfile"   : "demo.pyc.sv",
         "context"   : "<embedded>::miter"
-    },
-    "spec" : {
-        "pycspec" : "myspecs/demo"
     }
 }

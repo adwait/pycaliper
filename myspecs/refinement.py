@@ -1,7 +1,7 @@
 from pycaliper.per import *
 
 
-class FIFO(Module):
+class FIFO(SpecModule):
     def __init__(self, name="", width=3, **kwargs):
         super().__init__(name)
         self.width = width
@@ -28,7 +28,7 @@ class FIFO(Module):
         )
 
 
-class Counter(Module):
+class Counter(SpecModule):
     def __init__(self, name="", width=3, **kwargs):
         super().__init__(name)
         self.width = width

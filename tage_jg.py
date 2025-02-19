@@ -16,7 +16,10 @@ def test_main(bw):
     BHTWIDTH = bw
     TAGEWIDTH = BHTWIDTH - 2
 
-    args = PYCArgs(path="designs/tage/config_boundary.json")
+    args = PYCArgs(
+        specpath="myspecs/tage.boundary_spec",
+        jgcpath="designs/tage/config_boundary.json",
+    )
     is_conn, pyconfig, tmgr = setup_pyc_tmgr_jg(args)
 
     time_start = time()

@@ -1,7 +1,7 @@
-from pycaliper.per import Module, Logic
+from pycaliper.per import SpecModule, Logic
 
 
-class reg_en(Module):
+class reg_en(SpecModule):
     def __init__(self, width=32):
         super().__init__()
         self.width = width
@@ -23,7 +23,7 @@ class reg_en(Module):
         self.eq(self.q)
 
 
-class regblock_syn(Module):
+class regblock_syn(SpecModule):
     def __init__(self, width=32):
         super().__init__()
         self.width = width

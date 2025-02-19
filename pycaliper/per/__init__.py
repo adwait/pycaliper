@@ -1,12 +1,14 @@
 from .per import (
+    TypedElem,
     Logic,
     LogicArray,
     Struct,
     Group,
-    Module,
+    SpecModule,
     Eq,
     CondEq,
     Path,
+    get_path_from_hierarchical_str,
     Context,
     PER,
     Inv,
@@ -18,6 +20,7 @@ from .per import (
     AuxPort,
     AuxModule,
     unroll,
+    kinduct,
     rose,
     fell,
 )

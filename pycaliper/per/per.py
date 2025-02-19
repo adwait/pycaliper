@@ -13,7 +13,7 @@
             Single bitvectors
         Struct:
             Support for SystemVerilog structs
-        Module:
+        SpecModule:
             A module in the specification hierarchy, what else can it be?
 """
 
@@ -24,6 +24,10 @@ from enum import Enum
 from typing import Callable
 import copy
 from dataclasses import dataclass
+
+import inspect
+from functools import wraps
+from textwrap import indent
 
 from pycaliper.per.expr import Expr, Const
 
@@ -141,6 +145,14 @@ class Path:
     def __hash__(self) -> int:
         # Hash (required for dataclasses) based on the path string
         return hash(self.get_hier_path())
+
+
+def get_path_from_hierarchical_str(pathstr: str) -> Path:
+    """Get a path with a single level
+    Args: name (str): name of the singleton path
+    Returns: Path object
+    """
+    return Path([(name, []) for name in pathstr.split(".")])
 
 
 class TypedElem:
@@ -433,8 +445,8 @@ class Struct(TypedElem):
         self.name = name
         self.params = kwargs
         self.path = Path([])
-        self._signals: dict[str, TypedElem] = {}
-        self._pycinternal__state: list[PER] = []
+        self._pycinternal__signals: dict[str, TypedElem] = {}
+        self._pycinternal__state_tt: list[PER] = []
         self.root = root
 
     def _typ(self):
@@ -454,7 +466,7 @@ class Struct(TypedElem):
 
     def eq(self, expr: Expr) -> None:
         ceq = Eq(expr)
-        self._pycinternal__state.append(ceq)
+        self._pycinternal__state_tt.append(ceq)
 
     def when(self, cond: Expr):
         def _lambda(*pers: PER):
@@ -468,7 +480,7 @@ class Struct(TypedElem):
                 else:
                     logger.error(f"Invalid PER type: {per}")
                     sys.exit(1)
-            self._pycinternal__state.extend(ceqs)
+            self._pycinternal__state_tt.extend(ceqs)
 
         return _lambda
 
@@ -486,7 +498,7 @@ class Struct(TypedElem):
                 if obj.name == "":
                     obj.name = attr
                 sigattrs[obj.name] = obj.instantiate(path.add_level(obj.name))
-        self._signals = sigattrs
+        self._pycinternal__signals = sigattrs
         # INFO: This is not yet supported.
         # TODO: support state equality definitions for structs
         # self.state()
@@ -500,10 +512,10 @@ class Struct(TypedElem):
         s = ""
         s += f"struct {self.name}({self.__class__.__name__})"
         s += "signals:\n"
-        for k, v in self._signals.items():
+        for k, v in self._pycinternal__signals.items():
             s += f"\t{k} : {v._typ()}\n"
         s += "state:\n"
-        for i in self._pycinternal__state:
+        for i in self._pycinternal__state_tt:
             s += f"\t{i}\n"
         return s
 
@@ -513,7 +525,7 @@ class Struct(TypedElem):
 
     def get_repr(self, reprs):
         reprs[self.__class__.__name__] = repr(self)
-        for s, t in self._signals.items():
+        for s, t in self._pycinternal__signals.items():
             if isinstance(t, Struct):
                 if t.__class__.__name__ not in reprs:
                     reprs = t.get_repr(reprs)
@@ -522,7 +534,7 @@ class Struct(TypedElem):
     def __repr__(self):
         """Generate Python code for the struct definition"""
         inits = ["\tdef __init__(self, name = ''):", f"\t\tsuper().__init__(name)"]
-        for s, t in self._signals.items():
+        for s, t in self._pycinternal__signals.items():
             if isinstance(t, Logic):
                 inits.append(
                     f'\t\tself.{nonreserved_or_fresh(t.name)} = Logic({t.width}, "{t.name}")'
@@ -561,7 +573,7 @@ class Group:
                 isinstance(obj, Logic)
                 or isinstance(obj, LogicArray)
                 or isinstance(obj, Struct)
-                or isinstance(obj, Module)
+                or isinstance(obj, SpecModule)
             ):
                 if obj.name == "":
                     obj.name = attr
@@ -571,7 +583,7 @@ class Group:
     def get_repr(self, reprs):
         reprs[self.__class__.__name__] = repr(self)
         for s, t in self._elems.items():
-            if isinstance(t, Struct) or isinstance(t, Module):
+            if isinstance(t, Struct) or isinstance(t, SpecModule):
                 if t.__class__.__name__ not in reprs:
                     reprs = t.get_repr(reprs)
         return reprs
@@ -592,7 +604,7 @@ class Group:
                 inits.append(
                     f'\t\tself.{nonreserved_or_fresh(t.name)} = {t.__class__.__name__}("{t.name}")'
                 )
-            elif isinstance(t, Module):
+            elif isinstance(t, SpecModule):
                 inits.append(
                     f'\t\tself.{nonreserved_or_fresh(t.name)} = {t.__class__.__name__}("{t.name}", {t.params})'
                 )
@@ -729,24 +741,62 @@ class SimulationStep:
     def _assert(self, expr: Expr):
         self._pycinternal__assert.append(expr)
 
+    def __repr__(self) -> str:
+        stepstr = [f"\t\tself.pycassume({repr(e)})" for e in self._pycinternal__assume]
+        stepstr += [f"\t\tself.pycassert({repr(e)})" for e in self._pycinternal__assert]
+        return "\n".join(stepstr)
+
+
+class SimulationSchedule:
+    def __init__(self, name: str, depth: int):
+        self.name = name
+        self.depth = depth
+        self._pycinternal__steps: list[SimulationStep] = []
+
+    def step(self, step: SimulationStep):
+        self._pycinternal__steps.append(copy.deepcopy(step))
+
+    def __repr__(self) -> str:
+        fnstrs = [f"\t@unroll({self.depth})", f"\tdef {self.name}(self, i: int):"]
+        for i, step in enumerate(self._pycinternal__steps):
+            fnstrs.append(f"\t\t# Step {i}")
+            fnstrs.append(f"\t\tif i == {i}:")
+            fnstrs.append(indent(repr(step), "\t"))
+        return "\n".join(fnstrs)
+
+
+def kinduct(b: int):
+    """Decorator to set the k-induction depth for a state invariant specification."""
+
+    def kind_decorator(func):
+        @wraps(func)
+        def wrapper(self: SpecModule):
+            func(self)
+
+        wrapper._pycinternal__kind_depth = b
+        return wrapper
+
+    return kind_decorator
+
 
 def unroll(b: int):
+    """Decorator to set the unroll depth for a function in a SpecModule."""
+
     def unroll_decorator(func):
-        def wrapper(self: Module, *args):
-            for i in range(b):
-                self._pycinternal__simstep = SimulationStep()
-                func(self, i)
-                self._pycinternal__simsteps.append(
-                    copy.deepcopy(self._pycinternal__simstep)
-                )
+        @wraps(func)
+        def wrapper(self: SpecModule, i: int):
+            func(self, i)
+
+        wrapper._pycinternal__is_unroll_schedule = True
+        wrapper._pycinternal__unroll_depth = b
 
         return wrapper
 
     return unroll_decorator
 
 
-class Module:
-    """Module class for specifications related to a SV HW module"""
+class SpecModule:
+    """SpecModule class for specifications related to a SV HW module"""
 
     def __init__(self, name="", **kwargs) -> None:
         """
@@ -754,43 +804,51 @@ class Module:
             name (str, optional): non-default module name in the hierarchy. Defaults to '' which is
                 overriden by the attribute name.
         """
+        # Instance name in the hierarchy
         self.name = name
+        # Hierarchical path
         self.path: Path = Path([])
+        # Parameters of the module
         self.params = kwargs
+
         # Internal (private) members
+
+        # Helper variables
         # Has this module been elaborated (based on a top module)
-        self._instantiated = False
-        # _context keeps track of the scope in which declarations/specifications are being generated
-        self._context = Context.INPUT
-        # Logic, LogicArray, Struct
-        self._signals: dict[str, TypedElem] = {}
-        self._groups: dict[str, Group] = {}
-        self._functions: dict[str, SVFunc] = {}
-        self._submodules: dict[str, Module] = {}
+        self._pycinternal__instantiated = False
+        # Helper variable to track current declaration/specification scope
+        self._pycinternal__context = Context.INPUT
+        # Helper variable for unrolling
+        self._pycinternal__simstep: SimulationStep = SimulationStep()
+
+        # Objects in the SpecModule: Logic, LogicArray, Struct
+        self._pycinternal__signals: dict[str, TypedElem] = {}
+        self._pycinternal__groups: dict[str, Group] = {}
+        self._pycinternal__functions: dict[str, SVFunc] = {}
+        self._pycinternal__submodules: dict[str, SpecModule] = {}
         # PER specifications for input, state and output scopes
-        self._pycinternal__input: list[PER] = []
-        self._pycinternal__state: list[PER] = []
-        self._pycinternal__output: list[PER] = []
+        self._pycinternal__input_tt: list[PER] = []
+        self._pycinternal__state_tt: list[PER] = []
+        self._pycinternal__output_tt: list[PER] = []
         # Single trace specifications for input, state and output scopes
         self._pycinternal__input_invs: list[Inv] = []
         self._pycinternal__state_invs: list[Inv] = []
         self._pycinternal__output_invs: list[Inv] = []
-        # Non-invariant properties
-        self._pycinternal__simsteps: list[SimulationStep] = []
-        self._pycinternal__simstep: SimulationStep = SimulationStep()
+        # Non-invariant properties: mapping from caller function name to a symbolic schedule
+        self._pycinternal__simsteps: dict[str, SimulationSchedule] = {}
+
         # PER holes
-        self._perholes: list[PERHole] = []
+        self._pycinternal__perholes: list[PERHole] = []
         # CondEq holes
         # self._condeqholes: list[CondEqHole] = []
         # CtrAlign holes
-        self._caholes: list[CtrAlignHole] = []
+        self._pycinternal__caholes: list[CtrAlignHole] = []
         # FSM holes
-        self._fsmholes: list[FSMHole] = []
+        self._pycinternal__fsmholes: list[FSMHole] = []
 
-        self._auxmodules: dict[str, AuxModule] = {}
+        self._pycinternal__auxmodules: dict[str, AuxModule] = {}
         # self._auxregs = dict[str, AuxReg]
-
-        self._prev_signals = {}
+        self._pycinternal__prev_signals = {}
 
     # Invariant functions to be overloaded by descendant specification classes
     def input(self) -> None:
@@ -800,9 +858,6 @@ class Module:
         pass
 
     def output(self) -> None:
-        pass
-
-    def simstep(self, i: int = 0) -> None:
         pass
 
     def eq(self, *elems: TypedElem) -> None:
@@ -815,12 +870,12 @@ class Module:
                 eqs.extend([Eq(l) for l in elem.logic])
             elif isinstance(elem, Struct):
                 logger.error("Structs are not yet supported in Eq invariants.")
-        if self._context == Context.INPUT:
-            self._pycinternal__input.extend(eqs)
-        elif self._context == Context.STATE:
-            self._pycinternal__state.extend(eqs)
-        elif self._context == Context.OUTPUT:
-            self._pycinternal__output.extend(eqs)
+        if self._pycinternal__context == Context.INPUT:
+            self._pycinternal__input_tt.extend(eqs)
+        elif self._pycinternal__context == Context.STATE:
+            self._pycinternal__state_tt.extend(eqs)
+        elif self._pycinternal__context == Context.OUTPUT:
+            self._pycinternal__output_tt.extend(eqs)
         else:
             raise Exception("Invalid context")
 
@@ -859,12 +914,12 @@ class Module:
                 else:
                     logger.error(f"Invalid PER type: {per}")
                     sys.exit(1)
-                if self._context == Context.INPUT:
-                    self._pycinternal__input.extend(ceqs)
-                elif self._context == Context.STATE:
-                    self._pycinternal__state.extend(ceqs)
-                elif self._context == Context.OUTPUT:
-                    self._pycinternal__output.extend(ceqs)
+                if self._pycinternal__context == Context.INPUT:
+                    self._pycinternal__input_tt.extend(ceqs)
+                elif self._pycinternal__context == Context.STATE:
+                    self._pycinternal__state_tt.extend(ceqs)
+                elif self._pycinternal__context == Context.OUTPUT:
+                    self._pycinternal__output_tt.extend(ceqs)
 
         return _lambda
 
@@ -880,21 +935,21 @@ class Module:
         # Check that signal in current specification
         if (
             not isinstance(elem, Logic)
-            or elem.name not in self._signals
+            or elem.name not in self._pycinternal__signals
             or elem.is_arr_elem()
         ):
             logger.error(f"In prev: signal {elem.name} not found or is incompatible.")
             sys.exit(1)
         # Check if the previous signal has already been created
-        if elem.name in self._prev_signals:
-            return self._prev_signals[elem.name]
+        if elem.name in self._pycinternal__prev_signals:
+            return self._pycinternal__prev_signals[elem.name]
         # Create a new signal with the same name and path
         prevsig = copy.deepcopy(elem)
         prevsig.name = f"prev_{elem.name}"
         # Add the signal to the current specification
-        self._signals[prevsig.name] = prevsig
+        self._pycinternal__signals[prevsig.name] = prevsig
         # Add to the previous signals dictionary
-        self._prev_signals[elem.name] = prevsig
+        self._pycinternal__prev_signals[elem.name] = prevsig
         return prevsig
 
     def incr(self, x: Logic):
@@ -909,11 +964,16 @@ class Module:
         Args:
             exprs (list[Expr]): the list of expressions to consider as candidates for filling this hole.
         """
-        if self._context == Context.INPUT or self._context == Context.OUTPUT:
+        if (
+            self._pycinternal__context == Context.INPUT
+            or self._pycinternal__context == Context.OUTPUT
+        ):
             logger.error("Holes in input/output contexts currently not supported")
             sys.exit(1)
         for expr in exprs:
-            self._perholes.append(PERHole(Eq(expr), self._context))
+            self._pycinternal__perholes.append(
+                PERHole(Eq(expr), self._pycinternal__context)
+            )
 
     def condeqhole(self, cond: Expr, exprs: list[Expr]):
         """Creates a Conditional Eq (synthesis) hole.
@@ -922,11 +982,16 @@ class Module:
             cond (Expr): the condition for the Eq.
             exprs (list[Expr]): the list of expressions to consider as candidates for filling this hole.
         """
-        if self._context == Context.INPUT or self._context == Context.OUTPUT:
+        if (
+            self._pycinternal__context == Context.INPUT
+            or self._pycinternal__context == Context.OUTPUT
+        ):
             logger.error("Holes in input/output contexts currently not supported")
             sys.exit(1)
         for expr in exprs:
-            self._perholes.append(PERHole(CondEq(cond, expr), self._context))
+            self._pycinternal__perholes.append(
+                PERHole(CondEq(cond, expr), self._pycinternal__context)
+            )
 
     def ctralignhole(self, ctr: Logic, sigs: list[Logic]):
         """Creates a Control Alignment hole.
@@ -935,10 +1000,13 @@ class Module:
             ctr (Logic): the control signal that the branch conditions are based on.
             sigs (list[Logic]): the signals to learn lookup tables for.
         """
-        if self._context == Context.INPUT or self._context == Context.OUTPUT:
+        if (
+            self._pycinternal__context == Context.INPUT
+            or self._pycinternal__context == Context.OUTPUT
+        ):
             logger.error("Holes in input/output contexts currently not supported")
             sys.exit(1)
-        self._caholes.append(CtrAlignHole(ctr, sigs))
+        self._pycinternal__caholes.append(CtrAlignHole(ctr, sigs))
 
     def fsmhole(self, guardsigs: list[Logic], statesig: Logic):
         """Creates an FSM hole.
@@ -947,10 +1015,13 @@ class Module:
             guardsigs (list[Logic]): the guard signals for the FSM.
             statesig (Logic): the state signal for the FSM.
         """
-        if self._context == Context.INPUT or self._context == Context.OUTPUT:
+        if (
+            self._pycinternal__context == Context.INPUT
+            or self._pycinternal__context == Context.OUTPUT
+        ):
             logger.error("Holes in input/output contexts currently not supported")
             sys.exit(1)
-        self._fsmholes.append(FSMHole(guardsigs, statesig))
+        self._pycinternal__fsmholes.append(FSMHole(guardsigs, statesig))
 
     def inv(self, expr: Expr) -> None:
         """Add single trace invariants to the current context.
@@ -958,9 +1029,9 @@ class Module:
         Args:
             expr (Expr): the invariant expression.
         """
-        if self._context == Context.INPUT:
+        if self._pycinternal__context == Context.INPUT:
             self._pycinternal__input_invs.append(Inv(expr))
-        elif self._context == Context.STATE:
+        elif self._pycinternal__context == Context.STATE:
             self._pycinternal__state_invs.append(Inv(expr))
         else:
             self._pycinternal__output_invs.append(Inv(expr))
@@ -985,7 +1056,7 @@ class Module:
         Args:
             expr (Expr): the assertion expression.
         """
-        if self._context == Context.UNROLL:
+        if self._pycinternal__context == Context.UNROLL:
             self._pycinternal__simstep._assert(expr)
         else:
             logger.warning(
@@ -998,24 +1069,24 @@ class Module:
         Args:
             expr (Expr): the assumption expression.
         """
-        if self._context == Context.UNROLL:
+        if self._pycinternal__context == Context.UNROLL:
             self._pycinternal__simstep._assume(expr)
         else:
             logger.warning(
                 "pycassume can only be used in the unroll context, skipping."
             )
 
-    def instantiate(self, path: Path = Path([])) -> "Module":
-        """Instantiate the current Module.
+    def instantiate(self, path: Path = Path([])) -> "SpecModule":
+        """Instantiate the current SpecModule.
 
         Args:
             path (Path, optional): The path in the hierarchy to place this module at. Defaults to Path([]).
 
         Returns:
-            Module: return the instantiated module.
+            SpecModule: return the instantiated module.
         """
-        if self._instantiated:
-            logger.warning("Module already instantiated, skipping.")
+        if self._pycinternal__instantiated:
+            logger.warning("SpecModule already instantiated, skipping.")
             return
         self.path = path
         # Add all signals (Logic, LogicArray, Structs), groups, functions and submodules.
@@ -1058,27 +1129,69 @@ class Module:
                 if obj.name == "":
                     obj.name = attr
                 auxmoduleattrs[obj.name] = obj.instantiate(path.add_level(obj.name))
-            elif isinstance(obj, Module):
+            elif isinstance(obj, SpecModule):
                 if obj.name == "":
                     obj.name = attr
                 submoduleattrs[obj.name] = obj.instantiate(path.add_level(obj.name))
-        self._signals = sigattrs
-        self._groups = groupattrs
-        self._functions = funcattrs
-        self._submodules = submoduleattrs
-        self._auxmodules = auxmoduleattrs
+        self._pycinternal__signals = sigattrs
+        self._pycinternal__groups = groupattrs
+        self._pycinternal__functions = funcattrs
+        self._pycinternal__submodules = submoduleattrs
+        self._pycinternal__auxmodules = auxmoduleattrs
         # Call the specification generator methods.
-        self._context = Context.INPUT
+        self._pycinternal__context = Context.INPUT
         self.input()
-        self._context = Context.STATE
+        self._pycinternal__context = Context.STATE
         self.state()
-        self._context = Context.OUTPUT
+        if hasattr(self.state, "_pycinternal__kind_depth"):
+            self._pycinternal__kind_depth = getattr(
+                self.state, "_pycinternal__kind_depth"
+            )
+        else:
+            self._pycinternal__kind_depth: int = 1
+        self._pycinternal__context = Context.OUTPUT
         self.output()
         # Run through simulation steps
-        self._context = Context.UNROLL
-        self.simstep()
-        self._instantiated = True
+        self._pycinternal__context = Context.UNROLL
+        # Handle all unrolling schedules
+        #! removed: self.simstep()
+        # TODO: maybe this needs to be self.__class__
+        for i, fn in inspect.getmembers(self, predicate=inspect.ismethod):
+            if hasattr(fn, "_pycinternal__is_unroll_schedule"):
+                if hasattr(fn, "_pycinternal__unroll_depth"):
+                    logger.debug(
+                        "Unrolling schedule %s with depth %d",
+                        fn.__name__,
+                        fn._pycinternal__unroll_depth,
+                    )
+                    # Unroll this schedule
+                    fn_name = fn.__name__
+                    fn_unroll_depth = fn._pycinternal__unroll_depth
+                    # Create a new simulation schedule
+                    simschedule = SimulationSchedule(fn_name, fn_unroll_depth)
+                    for j in range(fn_unroll_depth):
+                        self._pycinternal__simstep = SimulationStep()
+                        fn(j)
+                        simschedule.step(self._pycinternal__simstep)
+                    self._pycinternal__simsteps[fn_name] = simschedule
+                else:
+                    logger.error(
+                        "Unroll schedule must have a depth specified, skipping"
+                    )
+                    continue
+
+        self._pycinternal__instantiated = True
         return self
+
+    def get_unroll_kind_depths(self):
+        if not self._pycinternal__instantiated:
+            logger.error(
+                "Module not instantiated, call instantiate() before max_counter_width()"
+            )
+            sys.exit(1)
+        # return maximum counter length between kind and unroll schedules
+        kd = self._pycinternal__kind_depth
+        return (kd, max([kd] + [v.depth for v in self._pycinternal__simsteps.values()]))
 
     def get_hier_path(self, sep: str = "."):
         """Call inner get_hier_path method."""
@@ -1088,38 +1201,38 @@ class Module:
         s = ""
         s += f"module {self.__class__.__name__}\n"
         s += "signals:\n"
-        for k, v in self._signals.items():
+        for k, v in self._pycinternal__signals.items():
             s += f"\t{k} : {v._typ()}\n"
         s += "submodules:\n"
-        for k, v in self._submodules.items():
+        for k, v in self._pycinternal__submodules.items():
             s += f"\t{k} : {v.__class__.__name__}\n"
         s += "input:\n"
-        for i in self._pycinternal__input:
+        for i in self._pycinternal__input_tt:
             s += f"\t{i}\n"
         s += "state:\n"
-        for i in self._pycinternal__state:
+        for i in self._pycinternal__state_tt:
             s += f"\t{i}\n"
         s += "output:\n"
-        for i in self._pycinternal__output:
+        for i in self._pycinternal__output_tt:
             s += f"\t{i}\n"
-        if self._perholes:
+        if self._pycinternal__perholes:
             s += "perholes:\n"
-            for i in self._perholes:
+            for i in self._pycinternal__perholes:
                 s += f"\t{i.per} ({i.ctx})\n"
         return s
 
     def get_repr(self, reprs):
         # Find all submodules and structs that need to be defined
         reprs[self.__class__.__name__] = repr(self)
-        for s, t in self._signals.items():
+        for s, t in self._pycinternal__signals.items():
             if isinstance(t, Struct):
                 if t.__class__.__name__ not in reprs:
                     reprs = t.get_repr(reprs)
-        for s, t in self._groups.items():
+        for s, t in self._pycinternal__groups.items():
             if t.__class__.__name__ not in reprs:
                 reprs = t.get_repr(reprs)
 
-        for s, t in self._submodules.items():
+        for s, t in self._pycinternal__submodules.items():
             if t.__class__.__name__ not in reprs:
                 reprs = t.get_repr(reprs)
         return reprs
@@ -1137,7 +1250,7 @@ class Module:
             "\tdef __init__(self, name = '', **kwargs):",
             f"\t\tsuper().__init__(name, kwargs)",
         ]
-        for s, t in self._signals.items():
+        for s, t in self._pycinternal__signals.items():
             if isinstance(t, Logic):
                 inits.append(
                     f'\t\tself.{nonreserved_or_fresh(t.name)} = Logic({t.width}, "{t.name}")'
@@ -1153,12 +1266,12 @@ class Module:
             else:
                 logger.error(f"Invalid signal type: {t}")
                 sys.exit(1)
-        for s, t in self._groups.items():
+        for s, t in self._pycinternal__groups.items():
             inits.append(
                 f'\t\tself.{nonreserved_or_fresh(t.name)} = {t.__class__.__name__}("{t.name}")'
             )
         initstring = "\n".join(inits)
-        for s, t in self._submodules.items():
+        for s, t in self._pycinternal__submodules.items():
             inits.append(
                 f'\t\tself.{nonreserved_or_fresh(t.name)} = {t.__class__.__name__}("{t.name}", {t.params})'
             )
@@ -1166,7 +1279,7 @@ class Module:
 
         inputs = (
             ["\tdef input(self):"]
-            + [f"\t\t{repr(t)}" for t in self._pycinternal__input]
+            + [f"\t\t{repr(t)}" for t in self._pycinternal__input_tt]
             + [f"\t\t{repr(t)}" for t in self._pycinternal__input_invs]
             + ["\t\tpass"]
         )
@@ -1174,24 +1287,28 @@ class Module:
 
         outputs = (
             ["\tdef output(self):"]
-            + [f"\t\t{repr(t)}" for t in self._pycinternal__output]
+            + [f"\t\t{repr(t)}" for t in self._pycinternal__output_tt]
             + [f"\t\t{repr(t)}" for t in self._pycinternal__output_invs]
             + ["\t\tpass"]
         )
         outputstring = "\n".join(outputs)
 
         states = (
-            ["\tdef state(self):"]
-            + [f"\t\t{repr(t)}" for t in self._pycinternal__state]
+            [f"\t@kind({self._pycinternal__kind_depth})\n\tdef state(self):"]
+            + [f"\t\t{repr(t)}" for t in self._pycinternal__state_tt]
             + [f"\t\t{repr(t)}" for t in self._pycinternal__state_invs]
-            + [f"\t\t{repr(t)}" for t in self._perholes if t.active]
+            + [f"\t\t{repr(t)}" for t in self._pycinternal__perholes if t.active]
             + ["\t\tpass"]
         )
         statestring = "\n".join(states)
 
+        simsteps = "\n\n".join(
+            [repr(v) for _, v in self._pycinternal__simsteps.items()]
+        )
+
         return f"""
 
-class {self.__class__.__name__}(Module):
+class {self.__class__.__name__}(SpecModule):
 
 {initstring}
 
@@ -1200,6 +1317,8 @@ class {self.__class__.__name__}(Module):
 {outputstring}
 
 {statestring}
+
+{simsteps}
         """
 
     def pprint(self):
@@ -1211,7 +1330,7 @@ class AuxPort(Logic):
         super().__init__(width, name, root)
 
 
-class AuxModule(Module):
+class AuxModule(SpecModule):
     def __init__(self, portmapping: dict[str, TypedElem], name="", **kwargs) -> None:
         super().__init__(name, **kwargs)
         self._pycinternal__ports = {}
@@ -1243,7 +1362,7 @@ class AuxModule(Module):
         portbindings = ",\n\t".join(portbindings)
 
         aux_mod_decl = f"""
-// Module {self.get_hier_path()}
+// SpecModule {self.get_hier_path()}
 {self.__class__.__name__} {self.name} (
         // Bindings
         {portbindings}

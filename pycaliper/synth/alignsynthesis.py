@@ -2,7 +2,7 @@ import logging
 import sys
 from vcdvcd import VCDVCD
 
-from ..per import Module, CtrAlignHole, Logic, Context
+from ..per import SpecModule, CtrAlignHole, Logic, Context
 
 from ..pycmanager import PYConfig
 from ..vcdutils import get_subtrace
@@ -61,7 +61,7 @@ class AlignSynthesizer:
         Returns:
             bool: True if module is well-formed, False otherwise
         """
-        caholes = self.topmod._caholes
+        caholes = self.topmod._pycinternal__caholes
         holesigs = [set(h.sigs) for h in caholes]
 
         for i in range(len(caholes)):
@@ -121,18 +121,18 @@ class AlignSynthesizer:
             else:
                 logger.info(f"No solution found for hole {cahole}.")
 
-    def synthesize(self, module: Module) -> Module:
+    def synthesize(self, module: SpecModule) -> SpecModule:
 
         self.topmod = module
 
         self.topmod.instantiate()
         if not self._inspect_module():
             logger.error(
-                "Module holes are not well-formed for AlignSynth, please check log. Exiting."
+                "SpecModule holes are not well-formed for AlignSynth, please check log. Exiting."
             )
             sys.exit(1)
 
-        for h in self.topmod._caholes:
+        for h in self.topmod._pycinternal__caholes:
             self._synthesize_cahole(h)
 
         return self.topmod

@@ -35,36 +35,33 @@ app = typer.Typer(help=DESCRIPTION)
 
 @app.command("verif")
 def verif_main(
-    path: Annotated[str, Argument(help="Path to the JSON config file")] = "",
-    # Allow using -m or --mock
-    mock: Annotated[
-        bool, Option("--mock", "-m", help="Run in offline (mock) mode?")
-    ] = False,
+    specpath: Annotated[str, Argument(help="Path to the PYC config file")] = "",
+    # Allow providing a configuration for Jasper
+    jgcpath: Annotated[
+        str, Option("-j", "--jgc", help="Path to the Jasper config file")
+    ] = "",
     # Allow using --params
     params: Annotated[
         str, Option(help="Parameters for the spec module: (<key>=<intvalue>)+")
     ] = "",
     # Allow using -s or --sdir
     sdir: Annotated[str, Option(help="Directory to save results to.")] = "",
-    # Allow using --port
-    port: Annotated[int, Option(help="Port number to connect to Jasper server")] = 8080,
     # Allow using --onetrace
     onetrace: Annotated[bool, Option(help="Verify only one-trace properties.")] = False,
     # Allow using --bmc
     bmc: Annotated[
-        bool, Option(help="Perform verification with bounded model checking.")
-    ] = False,
+        str, Option(help="Perform verification with bounded model checking.")
+    ] = "",
 ):
     args = PYCArgs(
-        path=path,
-        mock=mock,
+        specpath=specpath,
+        jgcpath=jgcpath,
         params=params,
         sdir=sdir,
-        port=port,
         onetrace=onetrace,
         bmc=bmc,
     )
-    if not bmc:
+    if bmc == "":
         if onetrace:
             pconfig, tmgr, module = start(PYCTask.VERIF1T, args)
             verifier = JGVerifier1Trace(pconfig)
@@ -73,29 +70,29 @@ def verif_main(
             pconfig, tmgr, module = start(PYCTask.VERIF2T, args)
             verifier = JGVerifier2Trace(pconfig)
             logger.debug("Running two trace verification.")
+        verifier.verify(module)
     else:
         pconfig, tmgr, module = start(PYCTask.VERIFBMC, args)
         verifier = JGVerifier1TraceBMC(pconfig)
         logger.debug("Running BMC verification.")
-
-    verifier.verify(module)
+        verifier.verify(module, bmc)
 
 
 @app.command("persynth")
 def persynth_main(
-    path: Annotated[str, Argument(help="Path to the JSON config file")] = "",
-    # Allow using -m or --mock
-    mock: Annotated[
-        bool, Option("--mock", "-m", help="Run in offline (mock) mode?")
-    ] = False,
+    specpath: Annotated[str, Argument(help="Path to the PYC config file")] = "",
+    # Allow providing a configuration for Jasper
+    jgcpath: Annotated[
+        str, Option("-j", "--jgc", help="Path to the Jasper config file")
+    ] = "",
     # Allow using --params
     params: Annotated[
         str, Option(help="Parameters for the spec module: (<key>=<intvalue>)+")
     ] = "",
     # Allow using -s or --sdir
-    sdir: Annotated[str, Option(help="Directory to save results to.")] = "",
-    # Allow using --port
-    port: Annotated[int, Option(help="Port number to connect to Jasper server")] = 8080,
+    sdir: Annotated[
+        str, Option("-s", "--sdir", help="Directory to save results to.")
+    ] = "",
     # Allow using --strategy
     strategy: Annotated[
         str, Option(help="Strategy to use for synthesis ['seq', 'rand', 'llm']")
@@ -107,8 +104,7 @@ def persynth_main(
     # Allow using --stepbudget
     stepbudget: Annotated[int, Option(help="Step budget for synthesis")] = 10,
 ):
-
-    args = PYCArgs(path=path, mock=mock, params=params, sdir=sdir, port=port)
+    args = PYCArgs(specpath=specpath, jgcpath=jgcpath, params=params, sdir=sdir)
     pconfig, tmgr, module = start(PYCTask.PERSYNTH, args)
 
     match strategy:
@@ -131,44 +127,40 @@ def persynth_main(
 
 @app.command("svagen")
 def svagen_main(
-    path: Annotated[str, Argument(help="Path to the JSON config file")] = "",
-    # Allow using -m or --mock
-    mock: Annotated[
-        bool, Option("--mock", "-m", help="Run in offline (mock) mode?")
-    ] = False,
+    specpath: Annotated[str, Argument(help="Path to the PYC config file")] = "",
+    # Allow providing a configuration for Jasper
+    jgcpath: Annotated[
+        str, Option("-j", "--jgc", help="Path to the Jasper config file")
+    ] = "",
     # Allow using --params
     params: Annotated[
         str, Option(help="Parameters for the spec module: (<key>=<intvalue>)+")
     ] = "",
     # Allow using -s or --sdir
     sdir: Annotated[str, Option(help="Directory to save results to.")] = "",
-    # Allow using --port
-    port: Annotated[int, Option(help="Port number to connect to Jasper server")] = 8080,
 ):
-    args = PYCArgs(path=path, mock=mock, params=params, sdir=sdir, port=port)
+    args = PYCArgs(specpath=specpath, jgcpath=jgcpath, params=params, sdir=sdir)
     pconfig, tmgr, module = start(PYCTask.SVAGEN, args)
 
     svagen = SVAGen(module)
-    svagen.create_pyc_specfile(k=pconfig.k, filename=pconfig.pycfile)
+    svagen.create_pyc_specfile(filename=pconfig.pycfile)
 
 
 @app.command("alignsynth")
 def alignsynth_main(
-    path: Annotated[str, Argument(help="Path to the JSON config file")] = "",
-    # Allow using -m or --mock
-    mock: Annotated[
-        bool, Option("--mock", "-m", help="Run in offline (mock) mode?")
-    ] = False,
+    specpath: Annotated[str, Argument(help="Path to the PYC config file")] = "",
+    # Allow providing a configuration for Jasper
+    jgcpath: Annotated[
+        str, Option("-j", "--jgc", help="Path to the Jasper config file")
+    ] = "",
     # Allow using --params
     params: Annotated[
         str, Option(help="Parameters for the spec module: (<key>=<intvalue>)+")
     ] = "",
     # Allow using -s or --sdir
     sdir: Annotated[str, Option(help="Directory to save results to.")] = "",
-    # Allow using --port
-    port: Annotated[int, Option(help="Port number to connect to Jasper server")] = 8080,
 ):
-    args = PYCArgs(path=path, mock=mock, params=params, sdir=sdir, port=port)
+    args = PYCArgs(specpath=specpath, jgcpath=jgcpath, params=params, sdir=sdir)
 
     pconfig, tmgr, module = start(PYCTask.CTRLSYNTH, args)
 
@@ -181,21 +173,19 @@ def alignsynth_main(
 
 @app.command("fullsynth")
 def fullsynth_main(
-    path: Annotated[str, Argument(help="Path to the JSON config file")] = "",
-    # Allow using -m or --mock
-    mock: Annotated[
-        bool, Option("--mock", "-m", help="Run in offline (mock) mode?")
-    ] = False,
+    specpath: Annotated[str, Argument(help="Path to the PYC config file")] = "",
+    # Allow providing a configuration for Jasper
+    jgcpath: Annotated[
+        str, Option("-j", "--jgc", help="Path to the Jasper config file")
+    ] = "",
     # Allow using --params
     params: Annotated[
         str, Option(help="Parameters for the spec module: (<key>=<intvalue>)+")
     ] = "",
     # Allow using -s or --sdir
     sdir: Annotated[str, Option(help="Directory to save results to.")] = "",
-    # Allow using --port
-    port: Annotated[int, Option(help="Port number to connect to Jasper server")] = 8080,
 ):
-    args = PYCArgs(path=path, mock=mock, params=params, sdir=sdir, port=port)
+    args = PYCArgs(specpath=specpath, jgcpath=jgcpath, params=params, sdir=sdir)
     pconfig, tmgr, module = start(PYCTask.FULLSYNTH, args)
 
     # PER Synthesizer

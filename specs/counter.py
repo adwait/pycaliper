@@ -1,7 +1,6 @@
 # auxmod.py
 
 from pycaliper.per import *
-from pycaliper.per.per import TypedElem
 
 
 class parity(AuxModule):
@@ -13,7 +12,7 @@ class parity(AuxModule):
         self.parity = Logic(1, "parity")
 
 
-class counter(Module):
+class counter(SpecModule):
     def __init__(self, name="", **kwargs) -> None:
         super().__init__(name, **kwargs)
         self.clk = Logic(1, "clk")
@@ -32,6 +31,7 @@ class counter(Module):
     def input(self) -> None:
         pass
 
+    @kinduct(3)
     def state(self) -> None:
         self.inv(self.counter(0) == self.parity.parity)
 

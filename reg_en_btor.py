@@ -22,7 +22,7 @@ prgm = btoropt.parse(parsewrapper("designs/regblock/btor/full_design.btor"))
 
 # engine.execute()
 
-pyconfig = PYConfig(clk="clk")
+pyconfig = PYConfig(clk=get_path_from_hierarchical_str("clk"))
 
 verifier = BTORVerifier1Trace(pyconfig, PYCBTORSymex(pyconfig, BoolectorSolver(), prgm))
 

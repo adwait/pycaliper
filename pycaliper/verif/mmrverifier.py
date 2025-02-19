@@ -1,4 +1,4 @@
-# Module to module refinement verification
+# SpecModule to module refinement verification
 
 import logging
 import sys
@@ -6,7 +6,7 @@ import sys
 from btor2ex import BTORSolver, BTORSort
 from pycaliper.per import Expr as PYCExpr
 import pycaliper.per.expr as pycexpr
-from pycaliper.per import Logic, Module, Path
+from pycaliper.per import Logic, SpecModule, Path
 
 
 logger = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ class MMRVerifier:
         assm.Dump("smt2")
         input("\nPRESS ENTER TO CONTINUE")
 
-    def check_refinement(self, mod1: Module, mod2: Module, rmap: list, k=1):
+    def check_refinement(self, mod1: SpecModule, mod2: SpecModule, rmap: list, k=1):
 
         if k != 1:
             raise NotImplementedError("Only 1-step refinement is supported")
@@ -137,14 +137,14 @@ class MMRVerifier:
         prev_a = []
         prev_b = []
         # Add the prev assumptions
-        for signame, prev_sig in mod1._prev_signals.items():
-            orig_sig = mod1._signals[signame]
+        for signame, prev_sig in mod1._pycinternal__prev_signals.items():
+            orig_sig = mod1._pycinternal__signals[signame]
             prev_a.append(
                 self.convert_expr_to_btor2(prev_sig, 1)
                 == self.convert_expr_to_btor2(orig_sig, 0)
             )
-        for signame, prev_sig in mod2._prev_signals.items():
-            orig_sig = mod2._signals[signame]
+        for signame, prev_sig in mod2._pycinternal__prev_signals.items():
+            orig_sig = mod2._pycinternal__signals[signame]
             prev_b.append(
                 self.convert_expr_to_btor2(prev_sig, 1)
                 == self.convert_expr_to_btor2(orig_sig, 0)

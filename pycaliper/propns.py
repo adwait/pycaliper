@@ -12,13 +12,17 @@ TOP_STATE_1T_PROP = "state_inv"
 TOP_OUTPUT_1T_PROP = "output_inv"
 
 STEP_PROP = "step"
-def TOP_STEP_PROP(k: int) -> str:
+
+
+def TOP_STEP_PROP(fn_name: str, k: int) -> str:
     """Get the property name for a given step"""
-    return f"{STEP_PROP}_{k}"
+    return f"{STEP_PROP}_{fn_name}_{k}"
+
 
 def get_as_assm(prop: str) -> str:
     """Get the assumption name for a given property"""
     return f"A_{prop}"
+
 
 def get_as_prop(prop: str) -> str:
     """Get the assertion name for a given property"""

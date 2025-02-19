@@ -11,7 +11,7 @@ from argparse import Namespace
 
 from tempfile import NamedTemporaryFile
 
-from pycaliper.pycmanager import get_pyconfig, PYCArgs, PYCTask, start
+from pycaliper.pycmanager import PYCArgs, PYCTask, start, get_pyconfig
 
 from pycaliper.frontend.pyclex import lexer
 from pycaliper.frontend.pycparse import parser
@@ -28,8 +28,9 @@ from btor2ex import BoolectorSolver
 from btor2ex.btor2ex.utils import parsewrapper
 
 from specs.regblock import regblock
-from specs.array_nonzerobase import array_nonzerobase
+from specs.array_nonzerobase import array_nonzerobase, array_nonzerobase2
 from specs.counter import counter
+from specs.adder import adder
 
 h1 = logging.StreamHandler(sys.stdout)
 h1.setLevel(logging.INFO)
@@ -50,11 +51,14 @@ class TestSVAGen(unittest.TestCase):
         svagen = SVAGen(mod)
         # Write to temporary file
         with open(f"tests/out/{svafile}", "w") as f:
-            svagen.create_pyc_specfile(k=2, filename=f.name)
+            svagen.create_pyc_specfile(filename=f.name)
             print(f"Wrote SVA specification to temporary file {f.name}")
 
     def test_array_nonzerobase(self):
         self.gen_sva(array_nonzerobase(), "array_nonzerobase.pyc.sv")
+
+    def test_array_nonzerobase2(self):
+        self.gen_sva(array_nonzerobase2(), "array_nonzerobase2.pyc.sv")
 
     def test_regblock(self):
         self.gen_sva(regblock(), "regblock.pyc.sv")
@@ -64,20 +68,29 @@ class TestSVAGen(unittest.TestCase):
 
 
 class TestVerifier(unittest.TestCase):
-    def gen_test(self, path, mock=False):
+    def gen_test(self, specpath, jgcpath):
         args = PYCArgs(
-            path=path, mock=mock, params="", sdir="", port=8080, onetrace=True, bmc=True
+            specpath=specpath,
+            jgcpath=jgcpath,
+            params="",
+            sdir="",
+            onetrace=True,
+            bmc=True,
         )
         return start(PYCTask.VERIFBMC, args)
 
     def test_regblock(self):
-        (pyconfig, tmgr, regb) = self.gen_test("designs/regblock/config.json")
+        (pyconfig, tmgr, regb) = self.gen_test(
+            "specs/regblock", "designs/regblock/config.json"
+        )
         invverif = JGVerifier2Trace(pyconfig)
         invverif.verify(regb)
         tmgr.close()
 
     def test_counter(self):
-        (pyconfig, tmgr, counter) = self.gen_test("designs/counter/config.json")
+        (pyconfig, tmgr, counter) = self.gen_test(
+            "specs/counter", "designs/counter/config.json"
+        )
         invverif = JGVerifier1Trace(pyconfig)
         invverif.verify(counter)
         tmgr.close()
@@ -122,37 +135,80 @@ class TestParser(unittest.TestCase):
 class BTORInterfaceTest(unittest.TestCase):
     def test_btormc_twosafe(self):
         prgm = btoropt.parse(parsewrapper("tests/btor/reg_en.btor"))
-        engine = PYCBTORSymex(BoolectorSolver("test"), prgm)
-        engine.add_eq_assms(["en", "d", "rst", "q"])
-        engine.add_eq_assrts(["q"])
+        args = PYCArgs(
+            specpath="specs/regblock",
+            jgcpath="",
+            params="",
+            sdir="",
+            onetrace=True,
+            bmc=True,
+        )
+        pycconfig = get_pyconfig(args)
+
+        engine = PYCBTORSymex(
+            pycconfig, BoolectorSolver("test"), prgm, cpy1="A", cpy2="B"
+        )
+        # engine.add_eq_assms(["en", "d", "rst", "q"])
+        # engine.add_eq_assrts(["q"])
         self.assertTrue(engine.inductive_two_safety())
 
     def test_btorverifier1(self):
         prgm = btoropt.parse(parsewrapper("tests/btor/regblock.btor"))
 
-        engine = BTORVerifier2Trace(PYCBTORSymex(BoolectorSolver("test"), prgm))
+        args = PYCArgs(
+            specpath="specs/regblock",
+            jgcpath="",
+            params="",
+            sdir="",
+            onetrace=True,
+            bmc=True,
+        )
+        pycconfig = get_pyconfig(args)
+
+        engine = BTORVerifier2Trace(
+            pycconfig,
+            PYCBTORSymex(pycconfig, BoolectorSolver("test"), prgm, cpy1="A", cpy2="B"),
+        )
         self.assertTrue(engine.verify(regblock()))
 
 
 class SymbolicSimulator(unittest.TestCase):
-    def gen_test(self, path):
+    def gen_test(self, specpath, jgcpath):
         args = PYCArgs(
-            path=path,
-            mock=False,
+            specpath=specpath,
+            jgcpath=jgcpath,
             params="",
             sdir="",
-            port=8080,
             onetrace=True,
             bmc=True,
         )
         return start(PYCTask.VERIFBMC, args)
 
     def test_adder(self):
-        (pconfig, tmgr, module) = self.gen_test("designs/adder/config.json")
+        (pconfig, tmgr, module) = self.gen_test(
+            "specs/adder", "designs/adder/config.json"
+        )
         verifier = JGVerifier1TraceBMC(pconfig)
         logger.debug("Running BMC verification.")
-        verifier.verify(module)
+        verifier.verify(module, "simstep")
         tmgr.close()
+
+
+class ReprTest(unittest.TestCase):
+    def test_adder(self):
+        addermod = adder()
+        addermod.instantiate()
+        addermodstr = repr(addermod)
+        self.assertIn(
+            "adder(SpecModule)", addermodstr, "Module name not present in repr"
+        )
+        self.assertIn("@unroll(3)", addermodstr, "Unrolling not present in repr")
+        self.assertIn("@kind(1)", addermodstr, "Kind decorator not present in repr")
+        self.assertIn(
+            "self.pycassume((~self.rst_ni))",
+            addermodstr,
+            "Assume statement not present in repr",
+        )
 
 
 if __name__ == "__main__":

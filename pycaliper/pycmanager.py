@@ -16,7 +16,7 @@ from pycaliper.jginterface.jgoracle import setjwd
 
 from pydantic import BaseModel
 
-from .per.per import Module
+from .per.per import SpecModule, Path, get_path_from_hierarchical_str
 
 logger = logging.getLogger(__name__)
 
@@ -32,20 +32,16 @@ class PYCTask(Enum):
 
 
 class PYCArgs(BaseModel):
-    path: str
-    mock: bool = False
+    specpath: str = ""
+    jgcpath: str = ""
     params: str = ""
     sdir: str = ""
-    port: int = 8080
     onetrace: bool = False
     bmc: bool = False
 
 
 class PYConfig(BaseModel):
     """PyCaliper configuration class"""
-
-    # Is this a mock run (without Jasper access)?
-    mock: bool = False
 
     # Working directory
     # wdir : str = ""
@@ -54,17 +50,21 @@ class PYConfig(BaseModel):
 
     # Jasper directory (relative to pycaliper dir)
     jdir: str = ""
+    # Is this a mock run (without Jasper access)?
+    mock: bool = False
     # Script to load in Jasper (relative to Jasper dir)
     script: str = ""
     # Verification context to use in Jasper
     context: str = ""
     # PyCaliper SVA filepath to use (relative to pycaliper dir)
     pycfile: str = ""
+    # Port to use
+    port: int = 8080
 
     # Specification location
     pycspec: str = ""
     # bound to use for the k-inductive proof
-    k: int = 1
+    # k: int = 1
     # Use only one trace for verification
     onetrace: bool = False
 
@@ -74,7 +74,7 @@ class PYConfig(BaseModel):
     tgprop: str = ""
     # VCD trace configuration elements
     # Clock signal name
-    clk: str = ""
+    clk: Path = Path([])
     # Simulation top level module in overall hierarchy
     ctx: str = ""
 
@@ -133,7 +133,7 @@ class PYCManager:
             return None
         return self.traces[random.randint(0, self.num_vcd_files - 1)]
 
-    def save_spec(self, module: Module):
+    def save_spec(self, module: SpecModule):
         # Create path
         path = f"{self.specdir}/{self.pycspec}.spec{self.num_spec_files}.py"
         self.specs[self.num_spec_files] = path
@@ -172,21 +172,23 @@ CONFIG_SCHEMA = {
                 "pycfile": {"type": "string"},
                 # Proof node context
                 "context": {"type": "string"},
+                # Port number to connect to Jasper server
+                "port": {"type": "integer"},
             },
             "required": ["jdir", "script", "pycfile", "context"],
         },
-        "spec": {
-            "type": "object",
-            "properties": {
-                # Location of the specification file
-                "pycspec": {"type": "string"},
-                # k-induction
-                "k": {"type": "integer"},
-                "params": {"type": "object"},
-            },
-            "required": ["pycspec", "k"],
-            "additionalProperties": False,
-        },
+        # "spec": {
+        #     "type": "object",
+        #     "properties": {
+        #         # Location of the specification file
+        #         "pycspec": {"type": "string"},
+        #         # k-induction
+        #         "k": {"type": "integer"},
+        #         "params": {"type": "object"},
+        #     },
+        #     "required": ["pycspec", "k"],
+        #     "additionalProperties": False,
+        # },
         "trace": {
             "type": "object",
             "properties": {
@@ -202,7 +204,8 @@ CONFIG_SCHEMA = {
             "required": ["tdir", "tgprop", "topmod"],
         },
     },
-    "required": ["jasper", "spec"],
+    "required": ["jasper"],
+    "additionalProperties": False,
 }
 
 
@@ -215,140 +218,118 @@ def get_specmodname(specmod):
     return specmod
 
 
-def create_module(specc, args):
+def create_module(specpath, args):
     """Dynamically import the spec module and create an instance of it."""
-    specmod: str = specc["pycspec"]
-    params = specc.get("params", {})
 
-    parsed_conf = {}
+    params = {}
     if args.params:
         for pair in args.params.split(","):
             key, value = pair.split("=")
-            parsed_conf[key] = int(value)
+            params[key] = int(value)
 
-    params.update(parsed_conf)
+    # Split the module name into the module name and the parent package
+    module_path, module_name = specpath.rsplit("/", 1)
 
-    if "/" in specmod:
-        # Split the module name into the module name and the parent package
-        module_path, module_name = specmod.rsplit("/", 1)
+    # Check if the path exists
+    if not os.path.isdir(module_path):
+        logger.error(f"Path '{module_path}' does not exist.")
+        exit(1)
+    # Add the module path to sys.path
+    sys.path.append(module_path)
 
-        # Check if the path exists
-        if not os.path.isdir(module_path):
-            logger.error(f"Path '{module_path}' does not exist.")
-            exit(1)
-        # Add the module path to sys.path
-        sys.path.append(module_path)
-
-        try:
-            if "." in module_name:
-                module_name, class_name = module_name.rsplit(".", 1)
-                module = importlib.import_module(module_name)
-                logger.debug(
-                    f"Successfully imported module: {module_name} from {module_path}"
-                )
-                return getattr(module, class_name)(**params)
-            else:
-                # Import the module using importlib
-                module = importlib.import_module(module_name)
-                logger.debug(
-                    f"Successfully imported module: {module_name} from {module_path}"
-                )
-                return getattr(module, module_name)(**params)
-        except ImportError as e:
-            logger.error(
-                f"Error importing module {module_name} from {module_path}: {e}"
+    try:
+        if "." in module_name:
+            module_name, class_name = module_name.rsplit(".", 1)
+            module = importlib.import_module(module_name)
+            logger.debug(
+                f"Successfully imported module: {module_name} from {module_path}"
             )
-            return None
-        finally:
-            # Clean up: remove the path from sys.path to avoid potential side effects
-            sys.path.remove(module_path)
+            return getattr(module, class_name)(**params)
+        else:
+            # Import the module using importlib
+            module = importlib.import_module(module_name)
+            logger.debug(
+                f"Successfully imported module: {module_name} from {module_path}"
+            )
+            return getattr(module, module_name)(**params)
+    except ImportError as e:
+        logger.error(f"Error importing module {module_name} from {module_path}: {e}")
+        return None
+    finally:
+        # Clean up: remove the path from sys.path to avoid potential side effects
+        sys.path.remove(module_path)
 
-    else:
-        mod = importlib.import_module(f"specs.{specmod}")
-        return getattr(mod, specmod)(**params)
 
-
-def mock_or_connect(pyconfig: PYConfig, port: int) -> bool:
+def mock_or_connect(pyconfig: PYConfig) -> bool:
     if pyconfig.mock:
         logger.info("Running in mock mode.")
         return False
     else:
-        jgc.connect_tcp("localhost", port)
+        jgc.connect_tcp("localhost", pyconfig.port)
         setjwd(pyconfig.jdir)
         return True
 
 
-def get_pyconfig(config, args: PYCArgs) -> PYConfig:
-    jasperc = config.get("jasper")
-    specc = config.get("spec")
-    tracec = config.get("trace", {})
+def get_pyconfig(args: PYCArgs) -> PYConfig:
+
+    if args.jgcpath != "":
+        # Create a Jasper configuration
+        with open(args.jgcpath, "r") as f:
+            jgconfig = json.load(f)
+        # And validate it
+        try:
+            validate(instance=jgconfig, schema=CONFIG_SCHEMA)
+        except ValidationError as e:
+            logger.error(f"Jasper config schema validation failed: {e.message}")
+            logger.error(
+                f"Please check schema:\n{json.dumps(CONFIG_SCHEMA, indent=4, sort_keys=True, separators=(',', ': '))}"
+            )
+            sys.exit(1)
+    else:
+        jgconfig = {}
+
+    jasperc = jgconfig.get(
+        "jasper", {"jdir": "", "script": "", "context": "", "pycfile": ""}
+    )
+    tracec = jgconfig.get("trace", {})
 
     return PYConfig(
-        # Is this a mock run
-        mock=args.mock,
         # Working directory
-        # wdir=wdir.name,
         sdir=args.sdir,
         # Jasper configuration
         jdir=jasperc["jdir"],
+        # Is this a mock run
+        mock=(args.jgcpath == ""),
         script=jasperc["script"],
         context=jasperc["context"],
         pycfile=f'{jasperc["jdir"]}/{jasperc["pycfile"]}',
+        port=jasperc.get("port", 8080),
         # Spec config
-        pycspec=get_specmodname(specc["pycspec"]),
-        k=specc["k"],
+        pycspec=get_specmodname(args.specpath),
         onetrace=args.onetrace,
         # Tracing configuration
         # Location where traces are provided
         tdir=tracec.get("tdir", ""),
         tgprop=tracec.get("tgprop", ""),
-        clk=tracec.get("clk", ""),
+        clk=get_path_from_hierarchical_str(tracec.get("clk", "")),
         ctx=tracec.get("topmod", ""),
     )
 
 
 def setup_pyc_tmgr_jg(args: PYCArgs) -> tuple[bool, PYConfig, PYCManager]:
-    with open(args.path, "r") as f:
-        config = json.load(f)
-
-    try:
-        validate(instance=config, schema=CONFIG_SCHEMA)
-    except ValidationError as e:
-        logger.error(f"Config schema validation failed: {e.message}")
-        logger.error(
-            f"Please check schema:\n{json.dumps(CONFIG_SCHEMA, indent=4, sort_keys=True, separators=(',', ': '))}"
-        )
-        sys.exit(1)
-
-    pyconfig = get_pyconfig(config, args)
+    pyconfig = get_pyconfig(args)
     tmgr = PYCManager(pyconfig)
-    is_connected = mock_or_connect(pyconfig, args.port)
+    is_connected = mock_or_connect(pyconfig)
 
     return is_connected, pyconfig, tmgr
 
 
-def start(task: PYCTask, args: PYCArgs) -> tuple[PYConfig, PYCManager, Module]:
+def start(task: PYCTask, args: PYCArgs) -> tuple[PYConfig, PYCManager, SpecModule]:
 
-    with open(args.path, "r") as f:
-        config = json.load(f)
+    is_connected, pyconfig, tmgr = setup_pyc_tmgr_jg(args)
 
-    try:
-        validate(instance=config, schema=CONFIG_SCHEMA)
-    except ValidationError as e:
-        logger.error(f"Config schema validation failed: {e.message}")
-        logger.error(
-            f"Please check schema:\n{json.dumps(CONFIG_SCHEMA, indent=4, sort_keys=True, separators=(',', ': '))}"
-        )
-        sys.exit(1)
-
-    pyconfig = get_pyconfig(config, args)
-
-    tmgr = PYCManager(pyconfig)
-
-    module = create_module(config.get("spec"), args)
-    assert module is not None, f"Module {config.get('spec')['pycspec']} not found."
-
-    is_connected = mock_or_connect(pyconfig, args.port)
+    module = create_module(args.specpath, args)
+    assert module is not None, f"SpecModule {args.specpath} not found."
 
     match task:
         case PYCTask.VERIF1T | PYCTask.VERIF2T | PYCTask.PERSYNTH | PYCTask.CTRLSYNTH:

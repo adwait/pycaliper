@@ -6,7 +6,7 @@ import logging
 
 from ..pycmanager import PYConfig
 
-from ..per import Module, PERHole, Context
+from ..per import SpecModule, PERHole, Context
 from .iis_strategy import *
 
 from pycaliper.svagen import SVAGen
@@ -195,10 +195,10 @@ class PERSynthesizer:
                     else:
                         return None
 
-    def synthesize(self, topmod: Module, retries: int = 1) -> Module:
+    def synthesize(self, topmod: SpecModule, retries: int = 1) -> SpecModule:
         # Create a new SVA generator
         self.svagen = SVAGen(topmod)
-        self.svagen.create_pyc_specfile(k=self.psc.k, filename=self.psc.pycfile)
+        self.svagen.create_pyc_specfile(filename=self.psc.pycfile)
         self.candidates = self.svagen.holes
 
         logger.info(f"Using strategy: {self.strategy.__class__.__name__}")
@@ -240,7 +240,7 @@ class PERSynthesizer:
                 logger.info(self.strategy.get_stats())
 
                 # Disable all eq holes
-                for c in topmod._perholes:
+                for c in topmod._pycinternal__perholes:
                     c.deactivate()
                 for inv in invs:
                     topmod._eq(self.candidates[inv], Context.STATE)

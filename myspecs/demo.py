@@ -4,7 +4,7 @@ from pycaliper.per.per import unroll
 DONE = Const(3, 2)
 
 
-class demo(Module):
+class demo(SpecModule):
     def __init__(self, name="", **kwargs) -> None:
         super().__init__(name, **kwargs)
         self.clk = Logic(1, "clk")

@@ -30,16 +30,14 @@ class JGVerifier1Trace(InvVerifier):
         """Verify one trace properties for the given module
 
         Args:
-            module (Module): Module to verify
+            module (SpecModule): SpecModule to verify
 
         Returns:
             bool: True if the module is safe, False otherwise
         """
 
         self.svagen = svagen.SVAGen(module)
-        self.svagen.create_pyc_specfile(
-            filename=self.psc.pycfile, k=self.psc.k, onetrace=True
-        )
+        self.svagen.create_pyc_specfile(filename=self.psc.pycfile, onetrace=True)
         self.candidates = self.svagen.holes
 
         loadscript(self.psc.script)
@@ -64,13 +62,13 @@ class JGVerifier2Trace(InvVerifier):
         """Verify two trace properties for the given module
 
         Args:
-            module (Module): Module to verify
+            module (SpecModule): SpecModule to verify
 
         Returns:
             bool: True if the module is safe, False otherwise
         """
         self.svagen = svagen.SVAGen(module)
-        self.svagen.create_pyc_specfile(filename=self.psc.pycfile, k=self.psc.k)
+        self.svagen.create_pyc_specfile(filename=self.psc.pycfile)
         self.candidates = self.svagen.holes
 
         loadscript(self.psc.script)
@@ -91,25 +89,31 @@ class JGVerifier1TraceBMC(InvVerifier):
         self.svagen = None
         self.candidates = None
 
-    def verify(self, module):
+    def verify(self, module, schedule: str):
         """Verify one trace properties for the given module
 
         Args:
-            module (Module): Module to verify
+            module (SpecModule): SpecModule to verify
+            schedule (str): Simulation constraints
 
         Returns:
             bool: True if the module is safe, False otherwise
         """
 
         self.svagen = svagen.SVAGen(module)
-        self.svagen.create_pyc_specfile(filename=self.psc.pycfile, k=self.psc.k)
+        self.svagen.create_pyc_specfile(filename=self.psc.pycfile)
         self.candidates = self.svagen.holes
 
         loadscript(self.psc.script)
         # Enable the assumptions for 1 trace verification
-        set_assm_bmc(self.psc.context, self.svagen.property_context)
+        set_assm_bmc(self.psc.context, self.svagen.property_context, schedule)
 
-        results = [is_pass(r) for r in prove_out_bmc(self.psc.context, self.psc.k)]
+        results = [
+            is_pass(r)
+            for r in prove_out_bmc(
+                self.psc.context, self.svagen.property_context, schedule
+            )
+        ]
         results_str = "\n\t".join(
             [
                 f"Step {i}: SAFE" if res else f"Step {i}: UNSAFE"

@@ -4,6 +4,7 @@ import os
 
 from . import jasperclient as jgc
 from ..svagen import SVAContext
+from ..propns import TOP_STEP_PROP
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,13 @@ def enable_assm(taskcon: str, assm: str):
     return res
 
 
+def disable_all_bmc(taskcon: str, svacon: SVAContext):
+    """Disable all BMC assumptions"""
+    for sched in svacon.assms_bmc:
+        for assm in svacon.assms_bmc[sched]:
+            disable_assm(taskcon, assm)
+
+
 def set_assm_induction_1t(taskcon: str, svacon: SVAContext):
     """Enable only 1-trace assumptions (required for 1 trace properties)
 
@@ -105,8 +113,7 @@ def set_assm_induction_1t(taskcon: str, svacon: SVAContext):
         disable_assm(taskcon, assm)
     for assm in svacon.assms_1trace:
         enable_assm(taskcon, assm)
-    for assm in svacon.assms_bmc:
-        disable_assm(taskcon, assm)
+    disable_all_bmc(taskcon, svacon)
 
 
 def set_assm_induction_2t(taskcon: str, svacon: SVAContext):
@@ -122,11 +129,10 @@ def set_assm_induction_2t(taskcon: str, svacon: SVAContext):
         enable_assm(taskcon, assm)
     for assm in svacon.assms_1trace:
         enable_assm(taskcon, assm)
-    for assm in svacon.assms_bmc:
-        disable_assm(taskcon, assm)
+    disable_all_bmc(taskcon, svacon)
 
 
-def set_assm_bmc(taskcon: str, svacon: SVAContext):
+def set_assm_bmc(taskcon: str, svacon: SVAContext, sched: str):
     """Enable all assumptions required for 1 BMC trace properties"""
     # Disable all holes
     for cand in svacon.holes:
@@ -135,8 +141,13 @@ def set_assm_bmc(taskcon: str, svacon: SVAContext):
         disable_assm(taskcon, assm)
     for assm in svacon.assms_1trace:
         disable_assm(taskcon, assm)
-    for assm in svacon.assms_bmc:
-        enable_assm(taskcon, assm)
+    for sched_ in svacon.assms_bmc:
+        if sched == sched_:
+            for assm in svacon.assms_bmc[sched_]:
+                enable_assm(taskcon, assm)
+        else:
+            for assm in svacon.assms_bmc[sched_]:
+                disable_assm(taskcon, assm)
 
 
 def prove_out_induction_1t(taskcon) -> ProofResult:
@@ -147,10 +158,10 @@ def prove_out_induction_2t(taskcon) -> ProofResult:
     return prove(taskcon, "output")
 
 
-def prove_out_bmc(taskcon, k: int) -> list[ProofResult]:
+def prove_out_bmc(taskcon, svacon: SVAContext, sched: str) -> list[ProofResult]:
     results = []
-    for i in range(k):
-        results.append(prove(taskcon, f"step_{i}"))
+    for i in range(len(svacon.asrts_bmc[sched])):
+        results.append(prove(taskcon, TOP_STEP_PROP(sched, i)))
     return results
 
 

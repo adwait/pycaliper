@@ -11,7 +11,7 @@ import logging
 from btoropt import program as prg
 from btor2ex import BTORSolver, BTORSort, BTOR2Ex
 
-from pycaliper.per import Logic
+from pycaliper.per import Logic, Path
 from pycaliper.per import Expr as PYCExpr
 import pycaliper.per.expr as pycexpr
 from pycaliper.pycmanager import PYConfig
@@ -100,9 +100,18 @@ class PYCBTORSymex(BTOR2Ex):
         """Add one-trace assertions"""
         self.inv_assrts.extend(assrts)
 
-    def get_lid(self, pth: PYCExpr) -> int:
+    def get_lid(self, pth_) -> int:
         """Get the LID (label-id) for a given path"""
-        path1 = f"{self.cpy1}.{pth}"
+        if isinstance(pth_, Path):
+            pth = pth_
+        elif isinstance(pth_, Logic):
+            pth = pth_.path
+        else:
+            logger.error(
+                "Element %s is neither a Path nor a Logic, but is %s", pth, type(pth)
+            )
+            sys.exit(1)
+        path1 = f"{self.cpy1}.{pth.get_hier_path()}"
         if path1 not in self.names:
             logger.error("Signal path %s not found in BTOR program", path1)
             sys.exit(1)
@@ -162,10 +171,19 @@ class PYCBTORSymex(BTOR2Ex):
                 print(expr.__class__.__name__)
                 sys.exit(1)
 
-    def get_lid_pair(self, pth: PYCExpr) -> tuple[int, int]:
+    def get_lid_pair(self, pth_) -> tuple[int, int]:
         """Get the LID (label-id) pair for a given path"""
-        path1 = f"{self.cpy1}.{pth}"
-        path2 = f"{self.cpy2}.{pth}"
+        if isinstance(pth_, Path):
+            pth = pth_
+        elif isinstance(pth_, Logic):
+            pth = pth_.path
+        else:
+            logger.error(
+                "Element %s is neither a Path nor a Logic, but is %s", pth, type(pth)
+            )
+            sys.exit(1)
+        path1 = f"{self.cpy1}.{pth.get_hier_path()}"
+        path2 = f"{self.cpy2}.{pth.get_hier_path()}"
         if path1 not in self.names:
             logger.error("Signal path %s not found in BTOR program", path1)
             sys.exit(1)
@@ -365,13 +383,12 @@ class PYCBTORSymex(BTOR2Ex):
         assm.Dump("smt2")
         # input("\nPRESS ENTER TO CONTINUE")
 
-    def inductive_one_safety(self) -> bool:
+    def inductive_one_safety(self, k: int = 1) -> bool:
         """Verifier for inductive one-trace property
 
         Returns:
             bool: is SAFE?
         """
-        k = self.pyconfig.k
         all_assms = []
         for i in range(k):
             # Unroll 2k times

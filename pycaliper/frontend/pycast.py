@@ -304,7 +304,7 @@ class ASTForLoop(ASTStmt):
         self.stmt = stmt
 
 
-# Module statements
+# SpecModule statements
 class ASTModStmt(PAST):
     def __init__(self, children=[]):
         super().__init__(children)

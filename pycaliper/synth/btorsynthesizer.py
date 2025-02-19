@@ -1,7 +1,7 @@
 import sys
 import logging
 
-from ..per import Module, Eq, CondEq
+from ..per import SpecModule, Eq, CondEq
 
 from ..btorinterface.pycbtorsymex import PYCBTORSymex
 
@@ -10,10 +10,10 @@ logger = logging.getLogger(__name__)
 
 class BTORSynthesizer:
     def __init__(self, slv: PYCBTORSymex):
-        self.topmod: Module = None
+        self.topmod: SpecModule = None
         self.slv = slv
 
-    def synthesize(self, module: Module) -> bool:
+    def synthesize(self, module: SpecModule) -> bool:
         """
         Perform hole-synthesis for a single module w.r.t. the following property:
             input_eq && state_eq |-> ##1 output_eq && state_eq
@@ -22,13 +22,13 @@ class BTORSynthesizer:
         self.topmod = module
         self.topmod.instantiate()
 
-        if not self.topmod._perholes:
+        if not self.topmod._pycinternal__perholes:
             logger.error(
                 "No holes to fill in a synthesizer, please use a verifier. Exiting."
             )
             sys.exit(1)
 
-        if self.topmod._caholes:
+        if self.topmod._pycinternal__caholes:
             logger.error(
                 "Ctrl holes not supported in this (BTOR) synthesizer. Exiting."
             )
@@ -40,13 +40,13 @@ class BTORSynthesizer:
         condeq_assrts = []
 
         # Generate the assumptions and assertions
-        for p in self.topmod._pycinternal__input:
+        for p in self.topmod._pycinternal__input_tt:
             match p:
                 case Eq():
                     eq_assms.append(p.logic)
                 case CondEq():
                     condeq_assms.append((p.cond, p.logic))
-        for p in self.topmod._pycinternal__state:
+        for p in self.topmod._pycinternal__state_tt:
             match p:
                 case Eq():
                     eq_assms.append(p.logic)
@@ -54,7 +54,7 @@ class BTORSynthesizer:
                 case CondEq():
                     condeq_assms.append((p.cond, p.logic))
                     condeq_assrts.append((p.cond, p.logic))
-        for p in self.topmod._pycinternal__output:
+        for p in self.topmod._pycinternal__output_tt:
             match p:
                 case Eq():
                     eq_assrts.append(p.logic)
@@ -66,7 +66,9 @@ class BTORSynthesizer:
         self.slv.add_eq_assrts(eq_assrts)
         self.slv.add_condeq_assrts(condeq_assrts)
 
-        self.slv.add_hole_constraints([hol.per.logic for hol in self.topmod._perholes])
+        self.slv.add_hole_constraints(
+            [hol.per.logic for hol in self.topmod._pycinternal__perholes]
+        )
 
         # Perform verification
         return self.slv.inductive_two_safety_syn()

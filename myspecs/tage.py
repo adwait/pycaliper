@@ -1,5 +1,4 @@
 from pycaliper.per import *
-from pycaliper.per.per import unroll
 
 from dataclasses import dataclass
 
@@ -39,7 +38,7 @@ class tage_config:
     PP_THRESHOLD: int = 2863311530
 
 
-class bht(Module):
+class bht(SpecModule):
     def __init__(self, name="", config: tage_config = tage_config(), **kwargs) -> None:
         super().__init__(name, **kwargs)
         # Inputs
@@ -72,7 +71,7 @@ class bht(Module):
         self.targ_o = Logic(32, "targ_o")
 
 
-class tage_table(Module):
+class tage_table(SpecModule):
     def __init__(self, name="", config: tage_config = tage_config(), **kwargs) -> None:
         super().__init__(name, **kwargs)
 
@@ -119,7 +118,7 @@ class tage_table(Module):
         self.u_o = Logic(2, "u_o")
 
 
-class tage_predictor(Module):
+class tage_predictor(SpecModule):
     def __init__(self, name="", config: tage_config = tage_config(), **kwargs) -> None:
         super().__init__(name, **kwargs)
 
@@ -151,7 +150,7 @@ class tage_predictor(Module):
         self.prev_domain = Logic(2, "prev_domain")
 
 
-class top_(Module):
+class top_(SpecModule):
     def __init__(self, name="", config: tage_config = tage_config(), **kwargs) -> None:
         super().__init__(name, **kwargs)
 
@@ -237,6 +236,7 @@ class boundary_spec(top_):
     def input(self):
         self.inv((~(self.domain_i == PRIV)) | (self.tp.idx_i < BOUNDARY))
 
+    @kinduct(2)
     def state(self):
         for i in range(1 << self.config.BHT_IDX_WIDTH):
             self.inv(self.tp.c_T0.bht_targ_priv[i] < BOUNDARY)
