@@ -8,7 +8,6 @@ import btoropt
 from pycaliper.per import *
 from pycaliper.pycmanager import PYConfig
 from pycaliper.verif.btorverifier import BTORVerifier1Trace
-from pycaliper.btorinterface.pycbtorsymex import PYCBTORSymex
 
 from myspecs.tage import boundary_spec, tage_config
 
@@ -29,15 +28,13 @@ def test_main(bw):
 
     pyconfig = PYConfig()
 
-    verifier = BTORVerifier1Trace(
-        pyconfig, PYCBTORSymex(pyconfig, BoolectorSolver(), prgm)
-    )
+    verifier = BTORVerifier1Trace(pyconfig)
 
     tage_conf = tage_config(BHT_IDX_WIDTH=BHTWIDTH, TAGE_IDX_WIDTH=TAGEWIDTH)
 
     # print(tage_conf.BHT_IDX_WIDTH)
 
-    result = verifier.verify(boundary_spec(config=tage_conf))
+    result = verifier.verify(boundary_spec(config=tage_conf), prgm)
 
     print(
         f"Verification result for {BHTWIDTH} {TAGEWIDTH}: ",

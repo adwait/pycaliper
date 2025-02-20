@@ -6,7 +6,6 @@ import btoropt
 from pycaliper.per import *
 from pycaliper.pycmanager import PYConfig
 from pycaliper.verif.btorverifier import BTORVerifier1Trace
-from pycaliper.btorinterface.pycbtorsymex import PYCBTORSymex
 
 from myspecs.demo import demo
 
@@ -24,13 +23,13 @@ prgm = btoropt.parse(parsewrapper("designs/demo/btor/full_design.btor"))
 
 pyconfig = PYConfig()
 
-verifier = BTORVerifier1Trace(pyconfig, PYCBTORSymex(pyconfig, BoolectorSolver(), prgm))
+verifier = BTORVerifier1Trace(pyconfig)
 
 
 # verifier.slv.preprocess()
 
 # print(verifier.slv.names)
 
-result = verifier.verify(demo())
+result = verifier.verify(demo(), prgm)
 
 print("Verification result: ", "PASS" if result else "FAIL")

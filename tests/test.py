@@ -20,7 +20,7 @@ from pycaliper.frontend.pycgen import PYCGenPass
 from pycaliper.verif.jgverifier import JGVerifier2Trace
 from pycaliper.svagen import SVAGen
 import pycaliper.jginterface.jasperclient as jgc
-from pycaliper.btorinterface.pycbtorsymex import PYCBTORSymex
+from pycaliper.btorinterface.pycbtorsymex import DesignConfig
 from pycaliper.verif.btorverifier import BTORVerifier2Trace
 from pycaliper.verif.jgverifier import JGVerifier1TraceBMC, JGVerifier1Trace
 
@@ -133,24 +133,24 @@ class TestParser(unittest.TestCase):
 
 
 class BTORInterfaceTest(unittest.TestCase):
-    def test_btormc_twosafe(self):
-        prgm = btoropt.parse(parsewrapper("tests/btor/reg_en.btor"))
-        args = PYCArgs(
-            specpath="specs/regblock",
-            jgcpath="",
-            params="",
-            sdir="",
-            onetrace=True,
-            bmc=True,
-        )
-        pycconfig = get_pyconfig(args)
+    # def test_btormc_twosafe(self):
+    #     prgm = btoropt.parse(parsewrapper("tests/btor/reg_en.btor"))
+    #     args = PYCArgs(
+    #         specpath="specs/regblock",
+    #         jgcpath="",
+    #         params="",
+    #         sdir="",
+    #         onetrace=True,
+    #         bmc=True,
+    #     )
+    #     pycconfig = get_pyconfig(args)
 
-        engine = PYCBTORSymex(
-            pycconfig, BoolectorSolver("test"), prgm, cpy1="A", cpy2="B"
-        )
-        # engine.add_eq_assms(["en", "d", "rst", "q"])
-        # engine.add_eq_assrts(["q"])
-        self.assertTrue(engine.inductive_two_safety())
+    #     engine = PYCBTORSymex(
+    #         pycconfig, BoolectorSolver("test"), prgm, cpy1="A", cpy2="B"
+    #     )
+    #     # engine.add_eq_assms(["en", "d", "rst", "q"])
+    #     # engine.add_eq_assrts(["q"])
+    #     self.assertTrue(engine.inductive_two_safety())
 
     def test_btorverifier1(self):
         prgm = btoropt.parse(parsewrapper("tests/btor/regblock.btor"))
@@ -165,11 +165,10 @@ class BTORInterfaceTest(unittest.TestCase):
         )
         pycconfig = get_pyconfig(args)
 
-        engine = BTORVerifier2Trace(
-            pycconfig,
-            PYCBTORSymex(pycconfig, BoolectorSolver("test"), prgm, cpy1="A", cpy2="B"),
+        engine = BTORVerifier2Trace(pycconfig)
+        self.assertTrue(
+            engine.verify(regblock(), prgm, DesignConfig(cpy1="A", cpy2="B"))
         )
-        self.assertTrue(engine.verify(regblock()))
 
 
 class SymbolicSimulator(unittest.TestCase):

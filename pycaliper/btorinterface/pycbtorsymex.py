@@ -11,11 +11,18 @@ import logging
 from btoropt import program as prg
 from btor2ex import BTORSolver, BTORSort, BTOR2Ex
 
-from pycaliper.per import Logic, Path
+from pycaliper.per import Logic, Path, SpecModule
 from pycaliper.per import Expr as PYCExpr
 import pycaliper.per.expr as pycexpr
 
+from pydantic import BaseModel
+
 logger = logging.getLogger(__name__)
+
+
+class DesignConfig(BaseModel):
+    cpy1: str = "a"
+    cpy2: str = "b"
 
 
 class PYCBTORSymex(BTOR2Ex):
@@ -24,16 +31,14 @@ class PYCBTORSymex(BTOR2Ex):
     """
 
     def __init__(
-        self,
-        solver: BTORSolver,
-        prog: list[prg.Instruction],
-        cpy1: str = "a",
-        cpy2: str = "b",
+        self, prog: list[prg.Instruction], dc: DesignConfig, specmodule: SpecModule
     ):
-        super().__init__(solver, prog)
+        super().__init__(BTORSolver("btor"), prog)
 
-        self.cpy1 = cpy1
-        self.cpy2 = cpy2
+        self.cpy1 = dc.cpy1
+        self.cpy2 = dc.cpy2
+
+        self.specmodule = specmodule
 
         # Two trace invariants
         self.eq_assms: list = []
@@ -343,7 +348,7 @@ class PYCBTORSymex(BTOR2Ex):
         return []
 
     def get_clock_constraints(self, states):
-        clk_lid = self.get_lid(self.pyconfig.clk)
+        clk_lid = self.get_lid(self.specmodule.get_clk())
         cons = []
         start_value = 0
         for state in states:
