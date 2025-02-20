@@ -30,6 +30,6 @@ verifier = BTORVerifier1Trace(pyconfig)
 
 # print(verifier.slv.names)
 
-result = verifier.verify(reg_en(), prgm)
+result = verifier.verify(reg_en().instantiate(), prgm)
 
 print("Verification result: ", "PASS" if result else "FAIL")

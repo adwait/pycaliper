@@ -197,8 +197,10 @@ class PERSynthesizer:
 
     def synthesize(self, topmod: SpecModule, retries: int = 1) -> SpecModule:
         # Create a new SVA generator
-        self.svagen = SVAGen(topmod)
-        self.svagen.create_pyc_specfile(filename=self.psc.pycfile)
+        assert topmod.is_instantiated(), "Module not instantiated."
+
+        self.svagen = SVAGen()
+        self.svagen.create_pyc_specfile(topmod, filename=self.psc.pycfile)
         self.candidates = self.svagen.holes
 
         logger.info(f"Using strategy: {self.strategy.__class__.__name__}")

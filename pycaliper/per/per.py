@@ -671,10 +671,10 @@ class Hole:
 class PERHole(Hole):
     """A synthesis hole for a PER"""
 
-    def __init__(self, per: PER, ctx: Context):
+    def __init__(self, per: PER, spec_ctx: Context):
         super().__init__()
         self.per = per
-        self.ctx = ctx
+        self.spec_ctx = spec_ctx
 
     def __repr__(self):
         if isinstance(self.per, Eq):
@@ -686,11 +686,11 @@ class PERHole(Hole):
 class CondEqHole(Hole):
     """A synthesis hole for a conditional equality PER"""
 
-    def __init__(self, cond: Expr, per: PER, ctx: Context):
+    def __init__(self, cond: Expr, per: PER, spec_ctx: Context):
         super().__init__()
         self.cond = cond
         self.per = per
-        self.ctx = ctx
+        self.spec_ctx = spec_ctx
 
     def __repr__(self):
         return f"self.when({repr(self.cond)})({repr(self.per)})"
@@ -886,16 +886,16 @@ class SpecModule:
         else:
             raise Exception("Invalid context")
 
-    def _eq(self, elem: Logic, ctx: Context) -> None:
+    def _eq(self, elem: Logic, spec_ctx: Context) -> None:
         """Add equality property with the specified context.
 
         Args:
             elem (Logic): the invariant expression.
-            ctx (Context): the context to add this invariant under.
+            spec_ctx (Context): the context to add this invariant under.
         """
-        if ctx == Context.INPUT:
+        if spec_ctx == Context.INPUT:
             self._pycinternal__input_invs.append(Eq(elem))
-        elif ctx == Context.STATE:
+        elif spec_ctx == Context.STATE:
             self._pycinternal__state_invs.append(Eq(elem))
         else:
             self._pycinternal__output_invs.append(Eq(elem))
@@ -1043,16 +1043,16 @@ class SpecModule:
         else:
             self._pycinternal__output_invs.append(Inv(expr))
 
-    def _inv(self, expr: Expr, ctx: Context) -> None:
+    def _inv(self, expr: Expr, spec_ctx: Context) -> None:
         """Add single trace invariants with the specified context.
 
         Args:
             expr (Expr): the invariant expression.
-            ctx (Context): the context to add this invariant under.
+            spec_ctx (Context): the context to add this invariant under.
         """
-        if ctx == Context.INPUT:
+        if spec_ctx == Context.INPUT:
             self._pycinternal__input_invs.append(Inv(expr))
-        elif ctx == Context.STATE:
+        elif spec_ctx == Context.STATE:
             self._pycinternal__state_invs.append(Inv(expr))
         else:
             self._pycinternal__output_invs.append(Inv(expr))
@@ -1194,6 +1194,9 @@ class SpecModule:
         self._pycinternal__instantiated = True
         return self
 
+    def is_instantiated(self):
+        return self._pycinternal__instantiated
+
     def get_unroll_kind_depths(self):
         if not self._pycinternal__instantiated:
             logger.error(
@@ -1232,7 +1235,7 @@ class SpecModule:
         if self._pycinternal__perholes:
             s += "perholes:\n"
             for i in self._pycinternal__perholes:
-                s += f"\t{i.per} ({i.ctx})\n"
+                s += f"\t{i.per} ({i.spec_ctx})\n"
         return s
 
     def get_repr(self, reprs):

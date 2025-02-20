@@ -33,27 +33,27 @@ def condeq_sva(s: str):
     return f"condeq_{s}"
 
 
-def per_sva(mod: SpecModule, ctx: Context):
-    if ctx == Context.INPUT:
+def per_sva(mod: SpecModule, spec_ctx: Context):
+    if spec_ctx == Context.INPUT:
         return f"{mod.get_hier_path('_')}_input"
-    elif ctx == Context.STATE:
+    elif spec_ctx == Context.STATE:
         return f"{mod.get_hier_path('_')}_state"
-    elif ctx == Context.OUTPUT:
+    elif spec_ctx == Context.OUTPUT:
         return f"{mod.get_hier_path('_')}_output"
     else:
-        logger.error(f"Invalid context {ctx}")
+        logger.error(f"Invalid context {spec_ctx}")
         sys.exit(1)
 
 
-def inv_sva(mod: SpecModule, ctx: Context):
-    if ctx == Context.INPUT:
+def inv_sva(mod: SpecModule, spec_ctx: Context):
+    if spec_ctx == Context.INPUT:
         return f"{mod.get_hier_path('_')}_input_inv"
-    elif ctx == Context.STATE:
+    elif spec_ctx == Context.STATE:
         return f"{mod.get_hier_path('_')}_state_inv"
-    elif ctx == Context.OUTPUT:
+    elif spec_ctx == Context.OUTPUT:
         return f"{mod.get_hier_path('_')}_output_inv"
     else:
-        logger.error(f"Invalid context {ctx}")
+        logger.error(f"Invalid context {spec_ctx}")
         sys.exit(1)
 
 
@@ -82,12 +82,15 @@ class SVAContext(BaseModel):
 
 
 class SVAGen:
-    def __init__(self, topmod: SpecModule) -> None:
-        self.topmod = topmod
+    def __init__(self) -> None:
+        self.topmod = None
         self.specs: dict[Path, ModuleSpec] = {}
-
         self.holes: dict[str, PERHole] = {}
+        self.property_context = SVAContext()
 
+    def _reset(self):
+        self.specs = {}
+        self.holes = {}
         self.property_context = SVAContext()
 
     def _generate_decls_for_per(self, per: PER):
@@ -124,26 +127,36 @@ class SVAGen:
         return (wirename, wirename, declsize)
 
     def _gen_1t_single(
-        self, mod: SpecModule, invs: list[Inv], ctx: Context, a: str = "a"
+        self, mod: SpecModule, invs: list[Inv], spec_ctx: Context, a: str = "a"
     ):
         inv_exprs = []
         for inv in invs:
             inv_exprs.append(inv.get_sva(a))
         inv_spec = "(\n\t" + " && \n\t".join(inv_exprs + ["1'b1"]) + ")"
-        return f"wire {inv_sva(mod, ctx)} = {inv_spec};"
+        return f"wire {inv_sva(mod, spec_ctx)} = {inv_spec};"
 
     def _gen_1t_comp(
-        self, mod: SpecModule, invs: list[Inv], ctx: Context, a: str = "a", b: str = "b"
+        self,
+        mod: SpecModule,
+        invs: list[Inv],
+        spec_ctx: Context,
+        a: str = "a",
+        b: str = "b",
     ):
         inv_exprs = []
         for inv in invs:
             inv_exprs.append(inv.get_sva(a))
             inv_exprs.append(inv.get_sva(b))
         inv_spec = "(\n\t" + " && \n\t".join(inv_exprs + ["1'b1"]) + ")"
-        return f"wire {inv_sva(mod, ctx)} = {inv_spec};"
+        return f"wire {inv_sva(mod, spec_ctx)} = {inv_spec};"
 
     def _gen_2t_comp(
-        self, mod: SpecModule, pers: list[PER], ctx: Context, a: str = "a", b: str = "b"
+        self,
+        mod: SpecModule,
+        pers: list[PER],
+        spec_ctx: Context,
+        a: str = "a",
+        b: str = "b",
     ):
         assigns_ = {}
         decls_ = {}
@@ -155,7 +168,7 @@ class SVAGen:
             decls_[declname] = f"logic {declname} {declsize};"
             declwires_.append(wirename)
         svaspec = "(\n\t" + " && \n\t".join(declwires_ + ["1'b1"]) + ")"
-        topdecl = f"wire {per_sva(mod, ctx)} = {svaspec};"
+        topdecl = f"wire {per_sva(mod, spec_ctx)} = {svaspec};"
         return (assigns_, decls_, topdecl)
 
     def _generate_decls(self, mod: SpecModule, a: str = "a", b: str = "b"):
@@ -384,9 +397,13 @@ class SVAGen:
             vlog += f"\tlogic {step_signal(i)} = ({COUNTER} == {counter_width}'d{i});\n"
         return vlog
 
-    def create_pyc_specfile(self, a="a", b="b", filename="temp.pyc.sv", onetrace=False):
+    def create_pyc_specfile(
+        self, topmod: SpecModule, a="a", b="b", filename="temp.pyc.sv", onetrace=False
+    ):
+        assert topmod.is_instantiated(), "Top module must be instantiated"
+        self._reset()
+        self.topmod = topmod
 
-        self.topmod.instantiate()
         kd, td = self.topmod.get_unroll_kind_depths()
         vlog = self.counter_step(kd, td)
 

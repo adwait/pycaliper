@@ -36,8 +36,10 @@ class JGVerifier1Trace(InvVerifier):
             bool: True if the module is safe, False otherwise
         """
 
-        self.svagen = svagen.SVAGen(module)
-        self.svagen.create_pyc_specfile(filename=self.psc.pycfile, onetrace=True)
+        self.svagen = svagen.SVAGen()
+        self.svagen.create_pyc_specfile(
+            module, filename=self.psc.pycfile, onetrace=True
+        )
         self.candidates = self.svagen.holes
 
         loadscript(self.psc.script)
@@ -67,8 +69,8 @@ class JGVerifier2Trace(InvVerifier):
         Returns:
             bool: True if the module is safe, False otherwise
         """
-        self.svagen = svagen.SVAGen(module)
-        self.svagen.create_pyc_specfile(filename=self.psc.pycfile)
+        self.svagen = svagen.SVAGen()
+        self.svagen.create_pyc_specfile(module, filename=self.psc.pycfile)
         self.candidates = self.svagen.holes
 
         loadscript(self.psc.script)
@@ -100,8 +102,8 @@ class JGVerifier1TraceBMC(InvVerifier):
             bool: True if the module is safe, False otherwise
         """
 
-        self.svagen = svagen.SVAGen(module)
-        self.svagen.create_pyc_specfile(filename=self.psc.pycfile)
+        self.svagen = svagen.SVAGen()
+        self.svagen.create_pyc_specfile(module, filename=self.psc.pycfile)
         self.candidates = self.svagen.holes
 
         loadscript(self.psc.script)

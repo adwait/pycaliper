@@ -14,15 +14,11 @@ from btor2ex import BTORSolver, BTORSort, BTOR2Ex
 from pycaliper.per import Logic, Path, SpecModule
 from pycaliper.per import Expr as PYCExpr
 import pycaliper.per.expr as pycexpr
+from pycaliper.pycmanager import DesignConfig
 
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
-
-
-class DesignConfig(BaseModel):
-    cpy1: str = "a"
-    cpy2: str = "b"
 
 
 class PYCBTORSymex(BTOR2Ex):

@@ -48,10 +48,11 @@ logger = logging.getLogger(__name__)
 
 class TestSVAGen(unittest.TestCase):
     def gen_sva(self, mod, svafile):
-        svagen = SVAGen(mod)
+        svagen = SVAGen()
         # Write to temporary file
         with open(f"tests/out/{svafile}", "w") as f:
-            svagen.create_pyc_specfile(filename=f.name)
+            mod.instantiate()
+            svagen.create_pyc_specfile(mod, filename=f.name)
             print(f"Wrote SVA specification to temporary file {f.name}")
 
     def test_array_nonzerobase(self):
@@ -84,6 +85,7 @@ class TestVerifier(unittest.TestCase):
             "specs/regblock", "designs/regblock/config.json"
         )
         invverif = JGVerifier2Trace(pyconfig)
+        regb.instantiate()
         invverif.verify(regb)
         tmgr.close()
 
@@ -92,6 +94,7 @@ class TestVerifier(unittest.TestCase):
             "specs/counter", "designs/counter/config.json"
         )
         invverif = JGVerifier1Trace(pyconfig)
+        counter.instantiate()
         invverif.verify(counter)
         tmgr.close()
 
@@ -167,7 +170,9 @@ class BTORInterfaceTest(unittest.TestCase):
 
         engine = BTORVerifier2Trace(pycconfig)
         self.assertTrue(
-            engine.verify(regblock(), prgm, DesignConfig(cpy1="A", cpy2="B"))
+            engine.verify(
+                regblock().instantiate(), prgm, DesignConfig(cpy1="A", cpy2="B")
+            )
         )
 
 
@@ -189,6 +194,7 @@ class SymbolicSimulator(unittest.TestCase):
         )
         verifier = JGVerifier1TraceBMC(pconfig)
         logger.debug("Running BMC verification.")
+        module.instantiate()
         verifier.verify(module, "simstep")
         tmgr.close()
 

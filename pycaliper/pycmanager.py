@@ -36,15 +36,19 @@ class PYCArgs(BaseModel):
     jgcpath: str = ""
     params: str = ""
     sdir: str = ""
+    tdir: str = ""
     onetrace: bool = False
     bmc: bool = False
+
+
+class DesignConfig(BaseModel):
+    cpy1: str = "a"
+    cpy2: str = "b"
 
 
 class PYConfig(BaseModel):
     """PyCaliper configuration class"""
 
-    # Working directory
-    # wdir : str = ""
     # Saving directory
     sdir: str = ""
 
@@ -63,18 +67,10 @@ class PYConfig(BaseModel):
 
     # Specification location
     pycspec: str = ""
-    # bound to use for the k-inductive proof
-    # k: int = 1
     # Use only one trace for verification
     onetrace: bool = False
-
-    # Directory of pre-provided traces
+    # Directory of VCD traces
     tdir: str = ""
-    # What is the property to generate traces?
-    tgprop: str = ""
-    # VCD trace configuration elements
-    # Simulation top level module in overall hierarchy
-    ctx: str = ""
 
 
 class PYCManager:
@@ -156,7 +152,7 @@ class PYCManager:
         logger.info("PyCaliper run completed, socket closed.")
 
 
-CONFIG_SCHEMA = {
+JG_CONFIG_SCHEMA = {
     "type": "object",
     "properties": {
         "jasper": {
@@ -174,31 +170,7 @@ CONFIG_SCHEMA = {
                 "port": {"type": "integer"},
             },
             "required": ["jdir", "script", "pycfile", "context"],
-        },
-        # "spec": {
-        #     "type": "object",
-        #     "properties": {
-        #         # Location of the specification file
-        #         "pycspec": {"type": "string"},
-        #         # k-induction
-        #         "k": {"type": "integer"},
-        #         "params": {"type": "object"},
-        #     },
-        #     "required": ["pycspec", "k"],
-        #     "additionalProperties": False,
-        # },
-        "trace": {
-            "type": "object",
-            "properties": {
-                # Where should traces be stored
-                "tdir": {"type": "string"},
-                # What is the property used for trace generation
-                "tgprop": {"type": "string"},
-                # What is the hierarchical top module
-                "topmod": {"type": "string"},
-            },
-            "required": ["tdir", "tgprop", "topmod"],
-        },
+        }
     },
     "required": ["jasper"],
     "additionalProperties": False,
@@ -274,11 +246,11 @@ def get_pyconfig(args: PYCArgs) -> PYConfig:
             jgconfig = json.load(f)
         # And validate it
         try:
-            validate(instance=jgconfig, schema=CONFIG_SCHEMA)
+            validate(instance=jgconfig, schema=JG_CONFIG_SCHEMA)
         except ValidationError as e:
             logger.error(f"Jasper config schema validation failed: {e.message}")
             logger.error(
-                f"Please check schema:\n{json.dumps(CONFIG_SCHEMA, indent=4, sort_keys=True, separators=(',', ': '))}"
+                f"Please check schema:\n{json.dumps(JG_CONFIG_SCHEMA, indent=4, sort_keys=True, separators=(',', ': '))}"
             )
             sys.exit(1)
     else:
@@ -287,7 +259,6 @@ def get_pyconfig(args: PYCArgs) -> PYConfig:
     jasperc = jgconfig.get(
         "jasper", {"jdir": "", "script": "", "context": "", "pycfile": ""}
     )
-    tracec = jgconfig.get("trace", {})
 
     return PYConfig(
         # Working directory
@@ -302,12 +273,9 @@ def get_pyconfig(args: PYCArgs) -> PYConfig:
         port=jasperc.get("port", 8080),
         # Spec config
         pycspec=get_specmodname(args.specpath),
+        # Trace directory
+        tdir=args.tdir,
         onetrace=args.onetrace,
-        # Tracing configuration
-        # Location where traces are provided
-        tdir=tracec.get("tdir", ""),
-        tgprop=tracec.get("tgprop", ""),
-        ctx=tracec.get("topmod", ""),
     )
 
 

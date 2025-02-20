@@ -25,8 +25,7 @@ class BTORVerifier2Trace(InvVerifier):
         Perform verification for a single module of the following property:
             input_eq && state_eq |-> ##1 output_eq && state_eq
         """
-        # TODO: assumes instantiated module
-        # Instantiate the module
+        assert specmodule.is_instantiated(), "Module not instantiated."
 
         slv = PYCBTORSymex(prgm, dc, specmodule)
 
@@ -88,8 +87,7 @@ class BTORVerifier1Trace(InvVerifier):
         Perform verification for a single module of the following property:
             input_eq && state_eq |-> ##1 output_eq && state_eq
         """
-        # TODO: assumes instantiated module
-        # Instantiate the module
+        assert specmodule.is_instantiated(), "Module not instantiated."
 
         slv = PYCBTORSymex(prgm, dc, specmodule)
 

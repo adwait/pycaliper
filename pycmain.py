@@ -9,7 +9,6 @@ from pycaliper.verif.jgverifier import (
 from pycaliper.synth.persynthesis import PERSynthesizer
 from pycaliper.synth.iis_strategy import SeqStrategy, RandomStrategy, LLMStrategy
 from pycaliper.svagen import SVAGen
-from pycaliper.synth.alignsynthesis import AlignSynthesizer
 from pycaliper.pycmanager import start, PYCTask, PYCArgs
 
 import typer
@@ -70,11 +69,13 @@ def verif_main(
             pconfig, tmgr, module = start(PYCTask.VERIF2T, args)
             verifier = JGVerifier2Trace(pconfig)
             logger.debug("Running two trace verification.")
+        module.instantiate()
         verifier.verify(module)
     else:
         pconfig, tmgr, module = start(PYCTask.VERIFBMC, args)
         verifier = JGVerifier1TraceBMC(pconfig)
         logger.debug("Running BMC verification.")
+        module.instantiate()
         verifier.verify(module, bmc)
 
 
@@ -119,6 +120,7 @@ def persynth_main(
             strat = SeqStrategy()
 
     synthesizer = PERSynthesizer(pconfig, strat, fuelbudget, stepbudget)
+    module.instantiate()
     finalmod = synthesizer.synthesize(module, retries)
 
     tmgr.save_spec(finalmod)
@@ -141,76 +143,9 @@ def svagen_main(
 ):
     args = PYCArgs(specpath=specpath, jgcpath=jgcpath, params=params, sdir=sdir)
     pconfig, tmgr, module = start(PYCTask.SVAGEN, args)
-
-    svagen = SVAGen(module)
-    svagen.create_pyc_specfile(filename=pconfig.pycfile)
-
-
-@app.command("alignsynth")
-def alignsynth_main(
-    specpath: Annotated[str, Argument(help="Path to the PYC config file")] = "",
-    # Allow providing a configuration for Jasper
-    jgcpath: Annotated[
-        str, Option("-j", "--jgc", help="Path to the Jasper config file")
-    ] = "",
-    # Allow using --params
-    params: Annotated[
-        str, Option(help="Parameters for the spec module: (<key>=<intvalue>)+")
-    ] = "",
-    # Allow using -s or --sdir
-    sdir: Annotated[str, Option(help="Directory to save results to.")] = "",
-):
-    args = PYCArgs(specpath=specpath, jgcpath=jgcpath, params=params, sdir=sdir)
-
-    pconfig, tmgr, module = start(PYCTask.CTRLSYNTH, args)
-
-    synthesizer = AlignSynthesizer(tmgr, pconfig)
-    asmod = synthesizer.synthesize(module)
-
-    tmgr.save_spec(asmod)
-    tmgr.save()
-
-
-@app.command("fullsynth")
-def fullsynth_main(
-    specpath: Annotated[str, Argument(help="Path to the PYC config file")] = "",
-    # Allow providing a configuration for Jasper
-    jgcpath: Annotated[
-        str, Option("-j", "--jgc", help="Path to the Jasper config file")
-    ] = "",
-    # Allow using --params
-    params: Annotated[
-        str, Option(help="Parameters for the spec module: (<key>=<intvalue>)+")
-    ] = "",
-    # Allow using -s or --sdir
-    sdir: Annotated[str, Option(help="Directory to save results to.")] = "",
-):
-    args = PYCArgs(specpath=specpath, jgcpath=jgcpath, params=params, sdir=sdir)
-    pconfig, tmgr, module = start(PYCTask.FULLSYNTH, args)
-
-    # PER Synthesizer
-    psynth = PERSynthesizer(pconfig)
-
-    verif = JGVerifier1Trace(pconfig)
-
-    # CA Synthesizer
-    asynth = AlignSynthesizer(tmgr, pconfig)
-    # Align synthesize module, save it and grab a copy
-    asmod = asynth.synthesize(module)
-    tmgr.save_spec(asmod)
-
-    # Check that invariants pass
-    res = verif.verify(asmod)
-    if res:
-        logger.info("Single trace verification passed, moving on to PER synthesis!")
-    else:
-        logger.error("Verification failed for single trace properties, quitting!")
-        sys.exit(1)
-
-    # PER Synthesize module
-    finalmod = psynth.synthesize(asmod)
-    tmgr.save_spec(finalmod)
-    tmgr.save()
+    module.instantiate()
+    svagen = SVAGen()
+    svagen.create_pyc_specfile(module, filename=pconfig.pycfile)
 
 
 if __name__ == "__main__":

@@ -11,8 +11,13 @@ from myspecs.demo import demo
 
 import logging
 
-# Log to a debug file with overwriting
-logging.basicConfig(filename="debug.log", level=logging.DEBUG, filemode="w")
+# Log to a debug file with overwriting and line number
+logging.basicConfig(
+    filename="debug.log",
+    level=logging.DEBUG,
+    filemode="w",
+    format="%(asctime)s::%(name)s::%(lineno)s::%(levelname)s::%(message)s",
+)
 
 
 prgm = btoropt.parse(parsewrapper("designs/demo/btor/full_design.btor"))
@@ -30,6 +35,6 @@ verifier = BTORVerifier1Trace(pyconfig)
 
 # print(verifier.slv.names)
 
-result = verifier.verify(demo(), prgm)
+result = verifier.verify(demo().instantiate(), prgm)
 
 print("Verification result: ", "PASS" if result else "FAIL")

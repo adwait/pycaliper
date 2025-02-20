@@ -34,7 +34,7 @@ def test_main(bw):
 
     # print(tage_conf.BHT_IDX_WIDTH)
 
-    result = verifier.verify(boundary_spec(config=tage_conf), prgm)
+    result = verifier.verify(boundary_spec(config=tage_conf).instantiate(), prgm)
 
     print(
         f"Verification result for {BHTWIDTH} {TAGEWIDTH}: ",

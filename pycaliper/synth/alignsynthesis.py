@@ -4,9 +4,8 @@ from vcdvcd import VCDVCD
 
 from ..per import SpecModule, CtrAlignHole, Logic, Context
 
-from ..pycmanager import PYConfig
 from ..vcdutils import get_subtrace
-from ..pycmanager import PYCManager
+from ..pycmanager import PYCManager, DesignConfig
 
 from ..jginterface.jgoracle import prove, is_pass, create_vcd_trace
 
@@ -16,11 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 class AlignSynthesizer:
-    def __init__(self, tmgr: PYCManager, pyconf: PYConfig) -> None:
-        self.pyconf = pyconf
+    def __init__(self, tmgr: PYCManager) -> None:
         self.tmgr = tmgr
-        # Top module
-        self.topmod = None
 
     def _sample_tracepath(self) -> str:
         """Generate a simulation VCD trace from the design
@@ -28,30 +24,13 @@ class AlignSynthesizer:
         Returns:
             str: path to the generated VCD trace
         """
-        if self.pyconf.mock or self.pyconf.tgprop == "":
-            logger.info(
-                "Mock mode enabled/tgprop unspecified, no new traces will be generated, replaying old traces."
-            )
-            vcd_path = self.tmgr.get_vcd_path_random()
-            if vcd_path is None:
-                logger.error("No traces found.")
-                sys.exit(1)
-            return vcd_path
-
-        # Check property
-        res = prove(self.pyconf.tgprop)
-        if is_pass(res):
-            logger.error("Property is SAFE, no traces!")
+        vcd_path = self.tmgr.get_vcd_path_random()
+        if vcd_path is None:
+            logger.error("No traces found.")
             sys.exit(1)
-
-        # Grab the trace
-        vcd_path = self.tmgr.create_vcd_path()
-        res = create_vcd_trace(self.pyconf.tgprop, vcd_path)
-        logger.debug(f"Trace generated at {vcd_path}.")
-
         return vcd_path
 
-    def _inspect_module(self) -> bool:
+    def _inspect_module(self, specmodule: SpecModule) -> bool:
         """Inspect the module for well-formedness
 
         Checks whether:
@@ -61,7 +40,7 @@ class AlignSynthesizer:
         Returns:
             bool: True if module is well-formed, False otherwise
         """
-        caholes = self.topmod._pycinternal__caholes
+        caholes = specmodule._pycinternal__caholes
         holesigs = [set(h.sigs) for h in caholes]
 
         for i in range(len(caholes)):
@@ -80,7 +59,9 @@ class AlignSynthesizer:
 
         return True
 
-    def _synthesize_cahole(self, mod: SpecModule, cahole: CtrAlignHole):
+    def _synthesize_cahole(
+        self, specmodule: SpecModule, cahole: CtrAlignHole, dc: DesignConfig
+    ):
         logger.debug(f"Attempting synthesis for hole {cahole}")
 
         vcdfile = self._sample_tracepath()
@@ -88,9 +69,9 @@ class AlignSynthesizer:
 
         intsigs = [cahole.ctr] + cahole.sigs
 
-        clk = mod.get_clk().get_hier_path()
+        clk = specmodule.get_clk().get_hier_path()
         # TODO: range should be a parameter
-        trace = get_subtrace(vcdobj, intsigs, range(0, 16), clk, self.pyconf.ctx)
+        trace = get_subtrace(vcdobj, intsigs, range(0, 16), clk, dc.cpy1)
 
         for s in cahole.sigs:
             zddsp = ZDDLUTSynthProgram(cahole.ctr, s)
@@ -119,22 +100,19 @@ class AlignSynthesizer:
                 cahole.deactivate()
 
                 inv = zddsp.get_inv()
-                self.topmod._inv(inv, Context.STATE)
+                specmodule._inv(inv, Context.STATE)
             else:
                 logger.info(f"No solution found for hole {cahole}.")
 
-    def synthesize(self, module: SpecModule) -> SpecModule:
+    def synthesize(self, specmodule: SpecModule, dc: DesignConfig) -> SpecModule:
 
-        self.topmod = module
-
-        self.topmod.instantiate()
-        if not self._inspect_module():
+        if not self._inspect_module(specmodule):
             logger.error(
                 "SpecModule holes are not well-formed for AlignSynth, please check log. Exiting."
             )
             sys.exit(1)
 
-        for h in self.topmod._pycinternal__caholes:
-            self._synthesize_cahole(self.topmod, h)
+        for h in specmodule._pycinternal__caholes:
+            self._synthesize_cahole(specmodule, h, dc)
 
-        return self.topmod
+        return specmodule
