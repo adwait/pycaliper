@@ -52,7 +52,7 @@ class TestSVAGen(unittest.TestCase):
         # Write to temporary file
         with open(f"tests/out/{svafile}", "w") as f:
             mod.instantiate()
-            svagen.create_pyc_specfile(mod, filename=f.name)
+            svagen.create_pyc_specfile(mod, filename=f.name, dc=DesignConfig())
             print(f"Wrote SVA specification to temporary file {f.name}")
 
     def test_array_nonzerobase(self):

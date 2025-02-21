@@ -4,8 +4,10 @@ from pycaliper.per import *
 
 
 class parity(AuxModule):
-    def __init__(self, portmapping: dict[str, TypedElem], name="", **kwargs) -> None:
-        super().__init__(portmapping, name, **kwargs)
+    def __init__(
+        self, portmapping: dict[str, TypedElem], name="", tt: bool = False, **kwargs
+    ) -> None:
+        super().__init__(portmapping, name, tt, **kwargs)
         self.clk = AuxPort(1, "clk")
         self.rst = AuxPort(1, "rst")
         self.counter = AuxPort(8, "counter")

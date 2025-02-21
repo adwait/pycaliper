@@ -1135,8 +1135,21 @@ class SpecModule:
             elif isinstance(obj, AuxModule):
                 # Current module must be top level
                 if obj.name == "":
-                    obj.name = attr
-                auxmoduleattrs[obj.name] = obj.instantiate(path.add_level(obj.name))
+                    name_base = attr
+                else:
+                    name_base = obj.name
+                if not obj.tt:
+                    obj.name = name_base + "_1"
+                    auxmoduleattrs[obj.name] = obj.instantiate(path.add_level(obj.name))
+                else:
+                    obj2 = copy.deepcopy(obj)
+                    obj.name = name_base + "_1"
+                    obj2.name = name_base + "_2"
+                    obj2.origcopy = False
+                    auxmoduleattrs[obj.name] = obj.instantiate(path.add_level(obj.name))
+                    auxmoduleattrs[obj2.name] = obj2.instantiate(
+                        path.add_level(obj2.name)
+                    )
             elif isinstance(obj, SpecModule):
                 if obj.name == "":
                     obj.name = attr
@@ -1351,10 +1364,15 @@ class AuxPort(Logic):
 
 
 class AuxModule(SpecModule):
-    def __init__(self, portmapping: dict[str, TypedElem], name="", **kwargs) -> None:
+    def __init__(
+        self, portmapping: dict[str, TypedElem], name="", tt: bool = False, **kwargs
+    ) -> None:
         super().__init__(name, **kwargs)
         self._pycinternal__ports = {}
         self.portmapping = portmapping
+        # Two trace module (should two copies of this module be created)
+        self.tt = tt
+        self.origcopy = True
 
     def instantiate(self, root: Path = Path([])) -> None:
         self.path = Path([])
@@ -1375,10 +1393,13 @@ class AuxModule(SpecModule):
                 sys.exit(1)
         return self
 
-    def get_instance_str(self, bindm: str):
+    def is_leftcopy(self):
+        return self.origcopy
+
+    def get_instance_str(self, bindinstance) -> str:
         portbindings = []
         for k, v in self.portmapping.items():
-            portbindings.append(f".{k}({bindm}.{v})")
+            portbindings.append(f".{k}({bindinstance}.{v})")
         portbindings = ",\n\t".join(portbindings)
 
         aux_mod_decl = f"""

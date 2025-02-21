@@ -4,7 +4,7 @@ import sys
 from btoropt import program as prg
 from ..btorinterface.pycbtorsymex import PYCBTORSymex, DesignConfig
 from ..per import SpecModule, Eq, CondEq
-from ..pycmanager import PYConfig
+from ..pycconfig import PYConfig
 
 from .invverifier import InvVerifier
 

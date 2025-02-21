@@ -4,7 +4,7 @@
 
 import logging
 
-from ..pycmanager import PYConfig
+from ..pycconfig import PYConfig
 
 from ..per import SpecModule, PERHole, Context
 from .iis_strategy import *
@@ -200,7 +200,9 @@ class PERSynthesizer:
         assert topmod.is_instantiated(), "Module not instantiated."
 
         self.svagen = SVAGen()
-        self.svagen.create_pyc_specfile(topmod, filename=self.psc.pycfile)
+        self.svagen.create_pyc_specfile(
+            topmod, filename=self.psc.pycfile, dc=self.psc.dc
+        )
         self.candidates = self.svagen.holes
 
         logger.info(f"Using strategy: {self.strategy.__class__.__name__}")

@@ -15,8 +15,8 @@ from pycaliper.jginterface import jasperclient as jgc
 from pycaliper.jginterface.jgoracle import setjwd
 
 from pydantic import BaseModel
-
-from .per.per import SpecModule, Path, get_path_from_hierarchical_str
+from .pycconfig import PYConfig, DesignConfig
+from .per.per import SpecModule
 
 logger = logging.getLogger(__name__)
 
@@ -34,43 +34,12 @@ class PYCTask(Enum):
 class PYCArgs(BaseModel):
     specpath: str = ""
     jgcpath: str = ""
+    dcpath: str = ""
     params: str = ""
     sdir: str = ""
     tdir: str = ""
     onetrace: bool = False
     bmc: bool = False
-
-
-class DesignConfig(BaseModel):
-    cpy1: str = "a"
-    cpy2: str = "b"
-
-
-class PYConfig(BaseModel):
-    """PyCaliper configuration class"""
-
-    # Saving directory
-    sdir: str = ""
-
-    # Jasper directory (relative to pycaliper dir)
-    jdir: str = ""
-    # Is this a mock run (without Jasper access)?
-    mock: bool = False
-    # Script to load in Jasper (relative to Jasper dir)
-    script: str = ""
-    # Verification context to use in Jasper
-    context: str = ""
-    # PyCaliper SVA filepath to use (relative to pycaliper dir)
-    pycfile: str = ""
-    # Port to use
-    port: int = 8080
-
-    # Specification location
-    pycspec: str = ""
-    # Use only one trace for verification
-    onetrace: bool = False
-    # Directory of VCD traces
-    tdir: str = ""
 
 
 class PYCManager:
@@ -177,6 +146,17 @@ JG_CONFIG_SCHEMA = {
 }
 
 
+D_CONFIG_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "cpy1": {"type": "string"},
+        "cpy2": {"type": "string"},
+    },
+    "required": ["cpy1"],
+    "additionalProperties": False,
+}
+
+
 def get_specmodname(specmod):
     if "/" in specmod:
         module_name = specmod.rsplit("/", 1)[1]
@@ -260,6 +240,23 @@ def get_pyconfig(args: PYCArgs) -> PYConfig:
         "jasper", {"jdir": "", "script": "", "context": "", "pycfile": ""}
     )
 
+    if args.dcpath != "":
+        with open(args.dcpath, "r") as f:
+            dconfig = json.load(f)
+        try:
+            validate(instance=dconfig, schema=D_CONFIG_SCHEMA)
+        except ValidationError as e:
+            logger.error(f"Design config schema validation failed: {e.message}")
+            logger.error(
+                f"Please check schema:\n{json.dumps(D_CONFIG_SCHEMA, indent=4, sort_keys=True, separators=(',', ': '))}"
+            )
+            sys.exit(1)
+        designc = DesignConfig(
+            cpy1=dconfig.get("cpy1", "a"), cpy2=dconfig.get("cpy2", "b")
+        )
+    else:
+        designc = DesignConfig()
+
     return PYConfig(
         # Working directory
         sdir=args.sdir,
@@ -276,6 +273,7 @@ def get_pyconfig(args: PYCArgs) -> PYConfig:
         # Trace directory
         tdir=args.tdir,
         onetrace=args.onetrace,
+        dc=designc,
     )
 
 

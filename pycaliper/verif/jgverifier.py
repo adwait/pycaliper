@@ -1,6 +1,6 @@
 import logging
 
-from ..pycmanager import PYConfig
+from ..pycconfig import PYConfig
 
 from .. import svagen
 from ..jginterface.jgoracle import (
@@ -38,7 +38,7 @@ class JGVerifier1Trace(InvVerifier):
 
         self.svagen = svagen.SVAGen()
         self.svagen.create_pyc_specfile(
-            module, filename=self.psc.pycfile, onetrace=True
+            module, filename=self.psc.pycfile, onetrace=True, dc=self.psc.dc
         )
         self.candidates = self.svagen.holes
 
@@ -70,7 +70,9 @@ class JGVerifier2Trace(InvVerifier):
             bool: True if the module is safe, False otherwise
         """
         self.svagen = svagen.SVAGen()
-        self.svagen.create_pyc_specfile(module, filename=self.psc.pycfile)
+        self.svagen.create_pyc_specfile(
+            module, filename=self.psc.pycfile, dc=self.psc.dc
+        )
         self.candidates = self.svagen.holes
 
         loadscript(self.psc.script)
@@ -103,7 +105,9 @@ class JGVerifier1TraceBMC(InvVerifier):
         """
 
         self.svagen = svagen.SVAGen()
-        self.svagen.create_pyc_specfile(module, filename=self.psc.pycfile)
+        self.svagen.create_pyc_specfile(
+            module, filename=self.psc.pycfile, dc=self.psc.dc
+        )
         self.candidates = self.svagen.holes
 
         loadscript(self.psc.script)

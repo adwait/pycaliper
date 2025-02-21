@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from .per import SpecModule, Eq, CondEq, Path, Context, PER, Inv, PERHole, AuxModule
 from .propns import *
+from .pycconfig import DesignConfig
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,7 @@ class SVAContext(BaseModel):
 class SVAGen:
     def __init__(self) -> None:
         self.topmod = None
+        self.dc: DesignConfig = DesignConfig()
         self.specs: dict[Path, ModuleSpec] = {}
         self.holes: dict[str, PERHole] = {}
         self.property_context = SVAContext()
@@ -126,44 +128,28 @@ class SVAGen:
         declsize = ""
         return (wirename, wirename, declsize)
 
-    def _gen_1t_single(
-        self, mod: SpecModule, invs: list[Inv], spec_ctx: Context, a: str = "a"
-    ):
+    def _gen_1t_single(self, mod: SpecModule, invs: list[Inv], spec_ctx: Context):
         inv_exprs = []
         for inv in invs:
-            inv_exprs.append(inv.get_sva(a))
+            inv_exprs.append(inv.get_sva(self.dc.cpy1))
         inv_spec = "(\n\t" + " && \n\t".join(inv_exprs + ["1'b1"]) + ")"
         return f"wire {inv_sva(mod, spec_ctx)} = {inv_spec};"
 
-    def _gen_1t_comp(
-        self,
-        mod: SpecModule,
-        invs: list[Inv],
-        spec_ctx: Context,
-        a: str = "a",
-        b: str = "b",
-    ):
+    def _gen_1t_comp(self, mod: SpecModule, invs: list[Inv], spec_ctx: Context):
         inv_exprs = []
         for inv in invs:
-            inv_exprs.append(inv.get_sva(a))
-            inv_exprs.append(inv.get_sva(b))
+            inv_exprs.append(inv.get_sva(self.dc.cpy1))
+            inv_exprs.append(inv.get_sva(self.dc.cpy2))
         inv_spec = "(\n\t" + " && \n\t".join(inv_exprs + ["1'b1"]) + ")"
         return f"wire {inv_sva(mod, spec_ctx)} = {inv_spec};"
 
-    def _gen_2t_comp(
-        self,
-        mod: SpecModule,
-        pers: list[PER],
-        spec_ctx: Context,
-        a: str = "a",
-        b: str = "b",
-    ):
+    def _gen_2t_comp(self, mod: SpecModule, pers: list[PER], spec_ctx: Context):
         assigns_ = {}
         decls_ = {}
         declwires_ = []
         for per in pers:
             (wirename, declname, declsize) = self._generate_decls_for_per(per)
-            exprname = per.get_sva(a, b)
+            exprname = per.get_sva(self.dc.cpy1, self.dc.cpy2)
             assigns_[wirename] = f"assign {wirename} = ({exprname});"
             decls_[declname] = f"logic {declname} {declsize};"
             declwires_.append(wirename)
@@ -171,7 +157,7 @@ class SVAGen:
         topdecl = f"wire {per_sva(mod, spec_ctx)} = {svaspec};"
         return (assigns_, decls_, topdecl)
 
-    def _generate_decls(self, mod: SpecModule, a: str = "a", b: str = "b"):
+    def _generate_decls_inner(self, mod: SpecModule):
 
         # Holes are not currently supported in submodules
         if mod != self.topmod and len(mod._pycinternal__perholes) != 0:
@@ -186,25 +172,25 @@ class SVAGen:
         assigns = {}
         # Generate recursively for submodules
         for _, submod in mod._pycinternal__submodules.items():
-            (inner_decls, inner_assigns) = self._generate_decls(submod, a, b)
+            (inner_decls, inner_assigns) = self._generate_decls_inner(submod)
             decls.update(inner_decls)
             assigns.update(inner_assigns)
 
         # Generate wires for current modules
         (assigns_, decls_, input_decl) = self._gen_2t_comp(
-            mod, mod._pycinternal__input_tt, Context.INPUT, a, b
+            mod, mod._pycinternal__input_tt, Context.INPUT
         )
         assigns.update(assigns_)
         decls.update(decls_)
 
         (assigns_, decls_, state_decl) = self._gen_2t_comp(
-            mod, mod._pycinternal__state_tt, Context.STATE, a, b
+            mod, mod._pycinternal__state_tt, Context.STATE
         )
         assigns.update(assigns_)
         decls.update(decls_)
 
         (assigns_, decls_, output_decl) = self._gen_2t_comp(
-            mod, mod._pycinternal__output_tt, Context.OUTPUT, a, b
+            mod, mod._pycinternal__output_tt, Context.OUTPUT
         )
         assigns.update(assigns_)
         decls.update(decls_)
@@ -214,28 +200,28 @@ class SVAGen:
                 (wirename, declname, declsize) = self._generate_decls_for_per_hole(
                     hole.per
                 )
-                exprname = hole.per.get_sva(a, b)
+                exprname = hole.per.get_sva(self.dc.cpy1, self.dc.cpy2)
                 assigns[wirename] = f"assign {wirename} = ({exprname});"
                 decls[declname] = f"logic {declname} {declsize};"
 
         input_inv_decl_comp = self._gen_1t_comp(
-            mod, mod._pycinternal__input_invs, Context.INPUT, a, b
+            mod, mod._pycinternal__input_invs, Context.INPUT
         )
         state_inv_decl_comp = self._gen_1t_comp(
-            mod, mod._pycinternal__state_invs, Context.STATE, a, b
+            mod, mod._pycinternal__state_invs, Context.STATE
         )
         output_inv_decl_comp = self._gen_1t_comp(
-            mod, mod._pycinternal__output_invs, Context.OUTPUT, a, b
+            mod, mod._pycinternal__output_invs, Context.OUTPUT
         )
 
         input_inv_decl_single = self._gen_1t_single(
-            mod, mod._pycinternal__input_invs, Context.INPUT, a
+            mod, mod._pycinternal__input_invs, Context.INPUT
         )
         state_inv_decl_single = self._gen_1t_single(
-            mod, mod._pycinternal__state_invs, Context.STATE, a
+            mod, mod._pycinternal__state_invs, Context.STATE
         )
         output_inv_decl_single = self._gen_1t_single(
-            mod, mod._pycinternal__output_invs, Context.OUTPUT, a
+            mod, mod._pycinternal__output_invs, Context.OUTPUT
         )
 
         self.specs[mod.path] = ModuleSpec(
@@ -253,7 +239,7 @@ class SVAGen:
 
         return (decls, assigns)
 
-    def generate_decls(self, a: str = "a", b: str = "b"):
+    def _generate_decls(self):
 
         properties = []
 
@@ -329,14 +315,14 @@ class SVAGen:
                         self._get_id_for_per_hole(hole.per)
                     )
 
-        return properties, self._generate_decls(self.topmod, a, b)
+        return properties, self._generate_decls_inner(self.topmod)
 
-    def generate_step_decls(self, a: str = "a") -> list[str]:
+    def _generate_step_decls(self) -> list[str]:
         """
         Generate properties for each step in the simulation
 
         Args:
-            a (str, optional): Name of the first trace. Defaults to "a".
+            dc (DesignConfig): Design configuration
 
         Returns:
             list[str]: List of properties for each step
@@ -347,9 +333,13 @@ class SVAGen:
             self.property_context.assms_bmc[sched_name] = []
             self.property_context.asrts_bmc[sched_name] = []
             for i, step in enumerate(steps):
-                assumes = [expr.get_sva(a) for expr in step._pycinternal__assume]
+                assumes = [
+                    expr.get_sva(self.dc.cpy1) for expr in step._pycinternal__assume
+                ]
                 assume_spec = "(\n\t" + " && \n\t".join(assumes + ["1'b1"]) + ")"
-                asserts = [expr.get_sva(a) for expr in step._pycinternal__assert]
+                asserts = [
+                    expr.get_sva(self.dc.cpy1) for expr in step._pycinternal__assert
+                ]
                 assert_spec = "(\n\t" + " && \n\t".join(asserts + ["1'b1"]) + ")"
 
                 # TODO: increase counter bound appropriately
@@ -398,22 +388,30 @@ class SVAGen:
         return vlog
 
     def create_pyc_specfile(
-        self, topmod: SpecModule, a="a", b="b", filename="temp.pyc.sv", onetrace=False
+        self,
+        topmod: SpecModule,
+        dc: DesignConfig,
+        filename="temp.pyc.sv",
+        onetrace=False,
     ):
         assert topmod.is_instantiated(), "Top module must be instantiated"
         self._reset()
         self.topmod = topmod
+        self.dc = dc
 
         kd, td = self.topmod.get_unroll_kind_depths()
         vlog = self.counter_step(kd, td)
 
-        properties, all_decls = self.generate_decls(a, b)
-        properties.extend(self.generate_step_decls(a))
+        properties, all_decls = self._generate_decls()
+        properties.extend(self._generate_step_decls())
 
         aux_modules = []
         # Get auxiliary modules if any
         for _, aux_mod in self.topmod._pycinternal__auxmodules.items():
-            aux_modules.append(aux_mod.get_instance_str(a))
+            if aux_mod.is_leftcopy():
+                aux_modules.append(aux_mod.get_instance_str(dc.cpy1))
+            else:
+                aux_modules.append(aux_mod.get_instance_str(dc.cpy2))
 
         with open(filename, "w") as f:
             f.write(vlog + "\n")

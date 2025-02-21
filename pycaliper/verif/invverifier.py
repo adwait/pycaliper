@@ -1,4 +1,4 @@
-from ..pycmanager import PYConfig
+from ..pycconfig import PYConfig
 
 
 class InvVerifier:

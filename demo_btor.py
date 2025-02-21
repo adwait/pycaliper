@@ -4,7 +4,7 @@ from btor2ex.btor2ex.utils import parsewrapper
 import btoropt
 
 from pycaliper.per import *
-from pycaliper.pycmanager import PYConfig
+from pycaliper.pycconfig import PYConfig
 from pycaliper.verif.btorverifier import BTORVerifier1Trace
 
 from myspecs.demo import demo

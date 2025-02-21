@@ -39,6 +39,9 @@ def verif_main(
     jgcpath: Annotated[
         str, Option("-j", "--jgc", help="Path to the Jasper config file")
     ] = "",
+    dcpath: Annotated[
+        str, Option("-d", "--dc", help="Path to the design configuration file")
+    ] = "",
     # Allow using --params
     params: Annotated[
         str, Option(help="Parameters for the spec module: (<key>=<intvalue>)+")
@@ -85,6 +88,9 @@ def persynth_main(
     # Allow providing a configuration for Jasper
     jgcpath: Annotated[
         str, Option("-j", "--jgc", help="Path to the Jasper config file")
+    ] = "",
+    dcpath: Annotated[
+        str, Option("-d", "--dc", help="Path to the design configuration file")
     ] = "",
     # Allow using --params
     params: Annotated[
@@ -134,6 +140,9 @@ def svagen_main(
     jgcpath: Annotated[
         str, Option("-j", "--jgc", help="Path to the Jasper config file")
     ] = "",
+    dcpath: Annotated[
+        str, Option("-d", "--dc", help="Path to the design configuration file")
+    ] = "",
     # Allow using --params
     params: Annotated[
         str, Option(help="Parameters for the spec module: (<key>=<intvalue>)+")
@@ -141,11 +150,13 @@ def svagen_main(
     # Allow using -s or --sdir
     sdir: Annotated[str, Option(help="Directory to save results to.")] = "",
 ):
-    args = PYCArgs(specpath=specpath, jgcpath=jgcpath, params=params, sdir=sdir)
+    args = PYCArgs(
+        specpath=specpath, jgcpath=jgcpath, dcpath=dcpath, params=params, sdir=sdir
+    )
     pconfig, tmgr, module = start(PYCTask.SVAGEN, args)
     module.instantiate()
     svagen = SVAGen()
-    svagen.create_pyc_specfile(module, filename=pconfig.pycfile)
+    svagen.create_pyc_specfile(module, filename=pconfig.pycfile, dc=pconfig.dc)
 
 
 if __name__ == "__main__":
