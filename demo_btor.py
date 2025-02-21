@@ -28,13 +28,13 @@ prgm = btoropt.parse(parsewrapper("designs/demo/btor/full_design.btor"))
 
 pyconfig = PYConfig()
 
-verifier = BTORVerifier1Trace(pyconfig)
+verifier = BTORVerifier1Trace()
 
 
 # verifier.slv.preprocess()
 
 # print(verifier.slv.names)
 
-result = verifier.verify(demo().instantiate(), prgm)
+result = verifier.verify(demo().instantiate(), prgm, pyconfig.dc)
 
 print("Verification result: ", "PASS" if result else "FAIL")

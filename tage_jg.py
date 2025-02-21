@@ -28,10 +28,10 @@ def test_main(bw):
 
     specmodule = boundary_spec(config=tage_conf)
 
-    verifier = JGVerifier1Trace(pyconfig)
+    verifier = JGVerifier1Trace()
     logger.debug("Running two trace verification.")
 
-    verifier.verify(specmodule)
+    verifier.verify(specmodule, pyconfig)
 
     time_end = time()
     print("Time taken: ", time_end - time_start)

@@ -28,13 +28,15 @@ def test_main(bw):
 
     pyconfig = PYConfig()
 
-    verifier = BTORVerifier1Trace(pyconfig)
+    verifier = BTORVerifier1Trace()
 
     tage_conf = tage_config(BHT_IDX_WIDTH=BHTWIDTH, TAGE_IDX_WIDTH=TAGEWIDTH)
 
     # print(tage_conf.BHT_IDX_WIDTH)
 
-    result = verifier.verify(boundary_spec(config=tage_conf).instantiate(), prgm)
+    result = verifier.verify(
+        boundary_spec(config=tage_conf).instantiate(), prgm, pyconfig.dc
+    )
 
     print(
         f"Verification result for {BHTWIDTH} {TAGEWIDTH}: ",

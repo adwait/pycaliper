@@ -84,18 +84,18 @@ class TestVerifier(unittest.TestCase):
         (pyconfig, tmgr, regb) = self.gen_test(
             "specs/regblock", "designs/regblock/config.json"
         )
-        invverif = JGVerifier2Trace(pyconfig)
+        invverif = JGVerifier2Trace()
         regb.instantiate()
-        invverif.verify(regb)
+        invverif.verify(regb, pyconfig)
         tmgr.close()
 
     def test_counter(self):
         (pyconfig, tmgr, counter) = self.gen_test(
             "specs/counter", "designs/counter/config.json"
         )
-        invverif = JGVerifier1Trace(pyconfig)
+        invverif = JGVerifier1Trace()
         counter.instantiate()
-        invverif.verify(counter)
+        invverif.verify(counter, pyconfig)
         tmgr.close()
 
 
@@ -166,9 +166,7 @@ class BTORInterfaceTest(unittest.TestCase):
             onetrace=True,
             bmc=True,
         )
-        pycconfig = get_pyconfig(args)
-
-        engine = BTORVerifier2Trace(pycconfig)
+        engine = BTORVerifier2Trace()
         self.assertTrue(
             engine.verify(
                 regblock().instantiate(), prgm, DesignConfig(cpy1="A", cpy2="B")
@@ -189,13 +187,13 @@ class SymbolicSimulator(unittest.TestCase):
         return start(PYCTask.VERIFBMC, args)
 
     def test_adder(self):
-        (pconfig, tmgr, module) = self.gen_test(
+        (pyconfig, tmgr, module) = self.gen_test(
             "specs/adder", "designs/adder/config.json"
         )
-        verifier = JGVerifier1TraceBMC(pconfig)
+        verifier = JGVerifier1TraceBMC()
         logger.debug("Running BMC verification.")
         module.instantiate()
-        verifier.verify(module, "simstep")
+        verifier.verify(module, pyconfig, "simstep")
         tmgr.close()
 
 

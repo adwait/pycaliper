@@ -66,20 +66,20 @@ def verif_main(
     if bmc == "":
         if onetrace:
             pconfig, tmgr, module = start(PYCTask.VERIF1T, args)
-            verifier = JGVerifier1Trace(pconfig)
+            verifier = JGVerifier1Trace()
             logger.debug("Running single trace verification.")
         else:
             pconfig, tmgr, module = start(PYCTask.VERIF2T, args)
-            verifier = JGVerifier2Trace(pconfig)
+            verifier = JGVerifier2Trace()
             logger.debug("Running two trace verification.")
         module.instantiate()
-        verifier.verify(module)
+        verifier.verify(module, pconfig)
     else:
         pconfig, tmgr, module = start(PYCTask.VERIFBMC, args)
-        verifier = JGVerifier1TraceBMC(pconfig)
+        verifier = JGVerifier1TraceBMC()
         logger.debug("Running BMC verification.")
         module.instantiate()
-        verifier.verify(module, bmc)
+        verifier.verify(module, bmc, pconfig)
 
 
 @app.command("persynth")

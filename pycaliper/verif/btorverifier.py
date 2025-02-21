@@ -6,20 +6,18 @@ from ..btorinterface.pycbtorsymex import PYCBTORSymex, DesignConfig
 from ..per import SpecModule, Eq, CondEq
 from ..pycconfig import PYConfig
 
-from .invverifier import InvVerifier
-
 logger = logging.getLogger(__name__)
 
 
-class BTORVerifier2Trace(InvVerifier):
-    def __init__(self, pyconfig: PYConfig):
-        super().__init__(pyconfig)
+class BTORVerifier2Trace:
+    def __init__(self):
+        pass
 
     def verify(
         self,
         specmodule: SpecModule,
         prgm: list[prg.Instruction],
-        dc: DesignConfig = DesignConfig(),
+        dc: DesignConfig,
     ) -> bool:
         """
         Perform verification for a single module of the following property:
@@ -73,15 +71,15 @@ class BTORVerifier2Trace(InvVerifier):
         return slv.inductive_two_safety()
 
 
-class BTORVerifier1Trace(InvVerifier):
-    def __init__(self, pyconfig: PYConfig):
-        super().__init__(pyconfig)
+class BTORVerifier1Trace:
+    def __init__(self):
+        pass
 
     def verify(
         self,
         specmodule: SpecModule,
         prgm: list[prg.Instruction],
-        dc: DesignConfig = DesignConfig(),
+        dc: DesignConfig,
     ) -> bool:
         """
         Perform verification for a single module of the following property:
