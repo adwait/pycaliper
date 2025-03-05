@@ -30,7 +30,24 @@ class GUIPacket:
     result: str = ""
 
 
-class WebGUI:
+class PYCGUI:
+    def __init__(self) -> None:
+        pass
+
+    def push_update(self, data: GUIPacket):
+        pass
+
+    def update_progress(self, desc: str, progress: float):
+        pass
+
+    def reset_progress(self):
+        pass
+
+    def run(self, debug=True):
+        pass
+
+
+class WebGUI(PYCGUI):
     def __init__(self) -> None:
         self.app = Flask(__name__)
         self.app.config["SECRET_KEY"] = "secret!"
@@ -68,15 +85,20 @@ class WebGUI:
     def update_progress(self, desc: str, progress: int):
         pass
 
+    def reset_progress(self):
+        pass
 
-class RichGUI:
+
+class RichGUI(PYCGUI):
     def __init__(self) -> None:
         self.window = self.mk_window()
         self.layout = self.window.renderable
         self.design_table = self.layout["designs"].renderable
         self.spec_table = self.layout["specs"].renderable
         self.proofs_table = self.layout["proofs"].renderable
+
         self.progress: Progress = self.layout["progress"].renderable
+        self.bar_task = self.progress.add_task("bar", total=1)
 
     def push_update(self, data: GUIPacket):
         # Add the new data to the table
@@ -88,15 +110,18 @@ class RichGUI:
             self.proofs_table.add_row(data.iden, data.sname, data.dname, data.result)
 
     def update_progress(self, desc: str, progress: int):
-        self.progress.update("bar", description=desc, advance=progress)
+        self.progress.update(self.bar_task, description=desc, advance=progress)
+
+    def reset_progress(self):
+        self.progress.reset(self.bar_task, description="Ongoing task")
 
     def mk_window(self):
         layout = Layout()
         layout.split_column(
-            Layout(name="designs"),
-            Layout(name="specs"),
-            Layout(name="proofs"),
-            Layout(name="progress"),
+            Layout(name="designs", ratio=1),
+            Layout(name="specs", ratio=1),
+            Layout(name="proofs", ratio=1),
+            Layout(name="progress", size=1),
         )
 
         design_table = Table(title="RTL Designs", expand=True)
@@ -118,7 +143,6 @@ class RichGUI:
         layout["proofs"].update(proofs_table)
 
         progress = Progress()
-        progress.add_task("bar", total=100)
         layout["progress"].update(progress)
 
         return Panel(layout, title="PyCaliper Status", expand=False, height=30)

@@ -15,6 +15,7 @@ from pycaliper.per import Logic, Path, SpecModule
 from pycaliper.per import Expr as PYCExpr
 import pycaliper.per.expr as pycexpr
 from pycaliper.pycmanager import DesignConfig
+from pycaliper.pycgui import PYCGUI
 
 from pydantic import BaseModel
 
@@ -27,9 +28,13 @@ class PYCBTORSymex(BTOR2Ex):
     """
 
     def __init__(
-        self, prog: list[prg.Instruction], dc: DesignConfig, specmodule: SpecModule
+        self,
+        prog: list[prg.Instruction],
+        dc: DesignConfig,
+        specmodule: SpecModule,
+        gui=None,
     ):
-        super().__init__(BTORSolver("btor"), prog)
+        super().__init__(BTORSolver("btor"), prog, gui)
 
         self.cpy1 = dc.cpy1
         self.cpy2 = dc.cpy2

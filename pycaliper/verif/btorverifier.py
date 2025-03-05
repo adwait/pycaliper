@@ -29,8 +29,8 @@ class BTORDesign(Design):
 
 
 class BTORVerifier2Trace:
-    def __init__(self):
-        pass
+    def __init__(self, gui=None) -> None:
+        self.gui = gui
 
     def verify(
         self,
@@ -44,7 +44,7 @@ class BTORVerifier2Trace:
         """
         assert specmodule.is_instantiated(), "Module not instantiated."
 
-        slv = PYCBTORSymex(des.prgm, dc, specmodule)
+        slv = PYCBTORSymex(des.prgm, dc, specmodule, gui=self.gui)
 
         if specmodule._pycinternal__perholes or specmodule._pycinternal__caholes:
             logger.error(
@@ -91,8 +91,8 @@ class BTORVerifier2Trace:
 
 
 class BTORVerifier1Trace:
-    def __init__(self):
-        pass
+    def __init__(self, gui=None):
+        self.gui = gui
 
     def verify(
         self,
@@ -106,7 +106,7 @@ class BTORVerifier1Trace:
         """
         assert specmodule.is_instantiated(), "Module not instantiated."
 
-        slv = PYCBTORSymex(des.prgm, dc, specmodule)
+        slv = PYCBTORSymex(des.prgm, dc, specmodule, gui=self.gui)
 
         if specmodule._pycinternal__perholes or specmodule._pycinternal__caholes:
             logger.warn("Holes found in a verifier, ignoring them.")
