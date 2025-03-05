@@ -28,7 +28,7 @@ logging.basicConfig(level=logging.DEBUG, handlers=[h1, h2])
 
 logger = logging.getLogger(__name__)
 
-DESCRIPTION = "Invariant verification and synthesis using Jasper."
+DESCRIPTION = "PyCaliper: Specification Synthesis and Verification Infrastructure. (c) Adwait Godbole, 2024-25."
 app = typer.Typer(help=DESCRIPTION)
 
 

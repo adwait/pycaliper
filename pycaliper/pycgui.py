@@ -10,6 +10,8 @@ from rich.layout import Layout
 from rich.panel import Panel
 from rich.console import Console
 from rich.progress import Progress
+from rich.text import Text
+from rich.terminal_theme import DIMMED_MONOKAI
 
 logger = logging.getLogger(__name__)
 
@@ -97,8 +99,9 @@ class RichGUI(PYCGUI):
         self.spec_table = self.layout["specs"].renderable
         self.proofs_table = self.layout["proofs"].renderable
 
-        self.progress: Progress = self.layout["progress"].renderable
-        self.bar_task = self.progress.add_task("bar", total=1)
+        self.progress: Progress = self.layout["tasks"]["progress"].renderable
+        self.task_name: Text = self.layout["tasks"]["name"].renderable
+        self.bar_task = self.progress.add_task("Progress:", total=1)
 
     def push_update(self, data: GUIPacket):
         # Add the new data to the table
@@ -110,10 +113,12 @@ class RichGUI(PYCGUI):
             self.proofs_table.add_row(data.iden, data.sname, data.dname, data.result)
 
     def update_progress(self, desc: str, progress: int):
-        self.progress.update(self.bar_task, description=desc, advance=progress)
+        self.layout["tasks"]["name"].update(Text(f"Ongoing task: {desc}", style="cyan"))
+        self.progress.update(self.bar_task, advance=progress)
 
     def reset_progress(self):
-        self.progress.reset(self.bar_task, description="Ongoing task")
+        self.layout["tasks"]["name"].update(Text("Ongoing task: None", style="cyan"))
+        self.progress.reset(self.bar_task, description="Progress")
 
     def mk_window(self):
         layout = Layout()
@@ -121,7 +126,7 @@ class RichGUI(PYCGUI):
             Layout(name="designs", ratio=1),
             Layout(name="specs", ratio=1),
             Layout(name="proofs", ratio=1),
-            Layout(name="progress", size=1),
+            Layout(name="tasks", size=1),
         )
 
         design_table = Table(title="RTL Designs", expand=True)
@@ -142,8 +147,16 @@ class RichGUI(PYCGUI):
         proofs_table.add_column("Result", style="cyan")
         layout["proofs"].update(proofs_table)
 
+        name = Text("Ongoing task: None", style="cyan")
         progress = Progress()
-        layout["progress"].update(progress)
+
+        layout["tasks"].split_row(
+            Layout(name="name", ratio=1),
+            Layout(name="progress", ratio=2),
+        )
+
+        layout["tasks"]["name"].update(name)
+        layout["tasks"]["progress"].update(progress)
 
         return Panel(layout, title="PyCaliper Status", expand=False, height=30)
 
@@ -154,7 +167,7 @@ class RichGUI(PYCGUI):
         """
 
         def run_gui():
-            with Live(self.window, refresh_per_second=4) as live:
+            with Live(self.window, refresh_per_second=2) as live:
                 while True:
                     pass
 

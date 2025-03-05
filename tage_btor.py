@@ -11,7 +11,7 @@ def test_main(bw):
     bw = bw
     tw = bw - 2
 
-    pm = ProofManager()
+    pm = ProofManager(cligui=True)
     pm.mk_btor_design_from_file(
         f"designs/tage/tage-predictor/btor/full_design_{bw}_{tw}.btor",
         f"tage_{bw}_{tw}",
