@@ -3,15 +3,11 @@ import sys
 import os
 
 import unittest
-import json
-
-import btoropt
-
-from argparse import Namespace
 
 from tempfile import NamedTemporaryFile
 
-from pycaliper.pycmanager import PYCArgs, PYCTask, start, get_pyconfig
+from pycaliper.pycmanager import PYCArgs, PYCTask, start
+from pycaliper.proofmanager import mk_btordesign
 
 from pycaliper.frontend.pyclex import lexer
 from pycaliper.frontend.pycparse import parser
@@ -19,13 +15,9 @@ from pycaliper.frontend.pycgen import PYCGenPass
 
 from pycaliper.verif.jgverifier import JGVerifier2Trace
 from pycaliper.svagen import SVAGen
-import pycaliper.jginterface.jasperclient as jgc
 from pycaliper.btorinterface.pycbtorsymex import DesignConfig
 from pycaliper.verif.btorverifier import BTORVerifier2Trace
 from pycaliper.verif.jgverifier import JGVerifier1TraceBMC, JGVerifier1Trace
-
-from btor2ex import BoolectorSolver
-from btor2ex.btor2ex.utils import parsewrapper
 
 from specs.regblock import regblock
 from specs.array_nonzerobase import array_nonzerobase, array_nonzerobase2
@@ -136,36 +128,8 @@ class TestParser(unittest.TestCase):
 
 
 class BTORInterfaceTest(unittest.TestCase):
-    # def test_btormc_twosafe(self):
-    #     prgm = btoropt.parse(parsewrapper("tests/btor/reg_en.btor"))
-    #     args = PYCArgs(
-    #         specpath="specs/regblock",
-    #         jgcpath="",
-    #         params="",
-    #         sdir="",
-    #         onetrace=True,
-    #         bmc=True,
-    #     )
-    #     pycconfig = get_pyconfig(args)
-
-    #     engine = PYCBTORSymex(
-    #         pycconfig, BoolectorSolver("test"), prgm, cpy1="A", cpy2="B"
-    #     )
-    #     # engine.add_eq_assms(["en", "d", "rst", "q"])
-    #     # engine.add_eq_assrts(["q"])
-    #     self.assertTrue(engine.inductive_two_safety())
-
     def test_btorverifier1(self):
-        prgm = btoropt.parse(parsewrapper("tests/btor/regblock.btor"))
-
-        args = PYCArgs(
-            specpath="specs/regblock",
-            jgcpath="",
-            params="",
-            sdir="",
-            onetrace=True,
-            bmc=True,
-        )
+        prgm = mk_btordesign("regblock", "tests/btor/regblock.btor")
         engine = BTORVerifier2Trace()
         self.assertTrue(
             engine.verify(

@@ -4,9 +4,28 @@ import sys
 from btoropt import program as prg
 from ..btorinterface.pycbtorsymex import PYCBTORSymex, DesignConfig
 from ..per import SpecModule, Eq, CondEq
-from ..pycconfig import PYConfig
+
+import hashlib
+import dill as pickle
 
 logger = logging.getLogger(__name__)
+
+
+class Design:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def __hash__(self):
+        raise NotImplementedError
+
+
+class BTORDesign(Design):
+    def __init__(self, name: str, prgm: list[prg.Instruction]) -> None:
+        self.name = name
+        self.prgm = prgm
+
+    def __hash__(self):
+        return hashlib.md5(pickle.dumps(self.prgm)).hexdigest()
 
 
 class BTORVerifier2Trace:
@@ -16,7 +35,7 @@ class BTORVerifier2Trace:
     def verify(
         self,
         specmodule: SpecModule,
-        prgm: list[prg.Instruction],
+        des: BTORDesign,
         dc: DesignConfig,
     ) -> bool:
         """
@@ -25,7 +44,7 @@ class BTORVerifier2Trace:
         """
         assert specmodule.is_instantiated(), "Module not instantiated."
 
-        slv = PYCBTORSymex(prgm, dc, specmodule)
+        slv = PYCBTORSymex(des.prgm, dc, specmodule)
 
         if specmodule._pycinternal__perholes or specmodule._pycinternal__caholes:
             logger.error(
@@ -78,7 +97,7 @@ class BTORVerifier1Trace:
     def verify(
         self,
         specmodule: SpecModule,
-        prgm: list[prg.Instruction],
+        des: BTORDesign,
         dc: DesignConfig,
     ) -> bool:
         """
@@ -87,7 +106,7 @@ class BTORVerifier1Trace:
         """
         assert specmodule.is_instantiated(), "Module not instantiated."
 
-        slv = PYCBTORSymex(prgm, dc, specmodule)
+        slv = PYCBTORSymex(des.prgm, dc, specmodule)
 
         if specmodule._pycinternal__perholes or specmodule._pycinternal__caholes:
             logger.warn("Holes found in a verifier, ignoring them.")

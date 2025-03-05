@@ -1,14 +1,6 @@
 import sys
 import logging
-from btor2ex import BoolectorSolver
-from btor2ex.btor2ex.utils import parsewrapper
-
-import btoropt
-
-from pycaliper.per import *
-from pycaliper.pycconfig import PYConfig
-from pycaliper.verif.btorverifier import BTORVerifier1Trace
-
+from pycaliper.proofmanager import ProofManager
 from myspecs.tage import boundary_spec, tage_config
 
 # Log to a debug file with overwriting
@@ -16,32 +8,20 @@ logging.basicConfig(filename="debug.log", level=logging.DEBUG, filemode="w")
 
 
 def test_main(bw):
-    BHTWIDTH = bw
-    TAGEWIDTH = BHTWIDTH - 2
+    bw = bw
+    tw = bw - 2
 
-    # prgm = btoropt.parse(parsewrapper("designs/tage/tage_predictor.btor"))
-    prgm = btoropt.parse(
-        parsewrapper(
-            f"designs/tage/tage-predictor/btor/full_design_{BHTWIDTH}_{TAGEWIDTH}.btor"
-        )
+    pm = ProofManager()
+    pm.mk_btor_design_from_file(
+        f"designs/tage/tage-predictor/btor/full_design_{bw}_{tw}.btor",
+        f"tage_{bw}_{tw}",
     )
-
-    pyconfig = PYConfig()
-
-    verifier = BTORVerifier1Trace()
-
-    tage_conf = tage_config(BHT_IDX_WIDTH=BHTWIDTH, TAGE_IDX_WIDTH=TAGEWIDTH)
-
-    # print(tage_conf.BHT_IDX_WIDTH)
-
-    result = verifier.verify(
-        boundary_spec(config=tage_conf).instantiate(), prgm, pyconfig.dc
+    pm.mk_spec(
+        boundary_spec,
+        "tage_boundary_spec",
+        config=tage_config(BHT_IDX_WIDTH=bw, TAGE_IDX_WIDTH=tw),
     )
-
-    print(
-        f"Verification result for {BHTWIDTH} {TAGEWIDTH}: ",
-        "PASS" if result else "FAIL",
-    )
+    pm.mk_btor_proof_one_trace("tage_boundary_spec", f"tage_{bw}_{tw}")
 
 
 if __name__ == "__main__":

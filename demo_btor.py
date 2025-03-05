@@ -1,12 +1,4 @@
-from btor2ex import BTOR2Ex, BoolectorSolver
-from btor2ex.btor2ex.utils import parsewrapper
-
-import btoropt
-
-from pycaliper.per import *
-from pycaliper.pycconfig import PYConfig
-from pycaliper.verif.btorverifier import BTORVerifier1Trace
-
+from pycaliper.proofmanager import ProofManager
 from myspecs.demo import demo
 
 import logging
@@ -19,22 +11,7 @@ logging.basicConfig(
     format="%(asctime)s::%(name)s::%(lineno)s::%(levelname)s::%(message)s",
 )
 
-
-prgm = btoropt.parse(parsewrapper("designs/demo/btor/full_design.btor"))
-
-# engine = BTOR2Ex(BoolectorSolver(), prgm)
-
-# engine.execute()
-
-pyconfig = PYConfig()
-
-verifier = BTORVerifier1Trace()
-
-
-# verifier.slv.preprocess()
-
-# print(verifier.slv.names)
-
-result = verifier.verify(demo().instantiate(), prgm, pyconfig.dc)
-
-print("Verification result: ", "PASS" if result else "FAIL")
+pm = ProofManager(cligui=True)
+prgm = pm.mk_btor_design_from_file("designs/demo/btor/full_design.btor", "demo")
+spec = pm.mk_spec(demo, "demo_spec")
+pr = pm.mk_btor_proof_one_trace(spec, prgm)
