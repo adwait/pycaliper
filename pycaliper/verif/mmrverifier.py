@@ -3,39 +3,58 @@
 import logging
 import sys
 
-from btor2ex import BTORSolver, BTORSort
+from dataclasses import dataclass
+
+from btor2ex import BTORSolver, BTORSort, BoolectorSolver
 from pycaliper.per import Expr as PYCExpr
 import pycaliper.per.expr as pycexpr
-from pycaliper.per import Logic, SpecModule, Path
+from pycaliper.per import Logic, SpecModule
 
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class RefinementMap:
+    mappings: list[tuple[PYCExpr, PYCExpr]]
+
+
+@dataclass
+class FunctionalRefinementMap(RefinementMap):
+    mappings: list[tuple[Logic, PYCExpr]]
+
+
 class MMRVerifier:
-    def __init__(self, slv: BTORSolver):
+    def __init__(self, slv: BTORSolver = BoolectorSolver()):
         self.slv = slv
         self.oplut = slv.oplut()
-
+        # Variable map (dynamic and needs to be reset for each check)
         self.varmap = {}
 
-    def convert_expr_to_btor2(self, expr: PYCExpr, step=0):
+    def reset(self):
+        self.varmap = {}
+
+    def convert_expr_to_btor2(self, expr: PYCExpr, bindinst: str, step=0):
         """Convert a PyCaliper expression to a BTOR2 expression"""
 
         logger.debug("Converting expression %s", expr)
 
         if isinstance(expr, Logic):
-            if f"{expr.name}_{step}" in self.varmap:
-                return self.varmap[f"{expr.name}_{step}"]
+            if f"{bindinst}_{expr.name}_{step}" in self.varmap:
+                return self.varmap[f"{bindinst}_{expr.name}_{step}"]
 
             logging.debug("Creating variable %s with width %d", expr.name, expr.width)
-            var = self.slv.mk_var(f"{expr.name}_{step}", BTORSort(expr.width))
-            self.varmap[f"{expr.name}_{step}"] = var
+            var = self.slv.mk_var(
+                f"{bindinst}_{expr.name}_{step}", BTORSort(expr.width)
+            )
+            self.varmap[f"{bindinst}_{expr.name}_{step}"] = var
             return var
 
         match expr:
             case pycexpr.OpApply(op=op, args=args):
-                operands = [self.convert_expr_to_btor2(arg, step) for arg in args]
+                operands = [
+                    self.convert_expr_to_btor2(arg, bindinst, step) for arg in args
+                ]
                 match op:
                     case pycexpr.LogicalAnd() | pycexpr.BinaryAnd():
                         return self.oplut["and"](*operands)
@@ -80,26 +99,25 @@ class MMRVerifier:
         assm.Dump("smt2")
         input("\nPRESS ENTER TO CONTINUE")
 
-    def check_refinement(self, mod1: SpecModule, mod2: SpecModule, rmap: list, k=1):
+    def check_refinement(self, mod1: SpecModule, mod2: SpecModule, rmap: RefinementMap):
+        # Reset the global symbolic state
+        self.reset()
+        CPY1 = "cpy1"
+        CPY2 = "cpy2"
 
-        if k != 1:
-            raise NotImplementedError("Only 1-step refinement is supported")
-
-        # Clear the variable map
-        self.varmap = {}
-
-        # Instantiate the modules
-        mod1.instantiate(Path([("a", [])]))
-        mod2.instantiate(Path([("b", [])]))
+        assert mod1.is_instantiated(), "Module 1 is not instantiated"
+        assert mod2.is_instantiated(), "Module 2 is not instantiated"
 
         # Generate the assumptions and assertions
         # Input expressions
-        input_a = []
-        input_b = []
-        for inv in mod1._pycinternal__input_invs:
-            input_a.append(self.convert_expr_to_btor2(inv.expr, 0))
-        for inv in mod2._pycinternal__input_invs:
-            input_b.append(self.convert_expr_to_btor2(inv.expr, 0))
+        input_a = [
+            self.convert_expr_to_btor2(inv.expr, CPY1, 0)
+            for inv in mod1._pycinternal__input_invs
+        ]
+        input_b = [
+            self.convert_expr_to_btor2(inv.expr, CPY2, 0)
+            for inv in mod2._pycinternal__input_invs
+        ]
 
         # State expressions
         state_a_pre = []
@@ -107,31 +125,33 @@ class MMRVerifier:
         state_a_post = []
         state_b_post = []
         for inv in mod1._pycinternal__state_invs:
-            state_a_pre.append(self.convert_expr_to_btor2(inv.expr, 0))
-            state_a_post.append(self.convert_expr_to_btor2(inv.expr, 1))
+            state_a_pre.append(self.convert_expr_to_btor2(inv.expr, CPY1, 0))
+            state_a_post.append(self.convert_expr_to_btor2(inv.expr, CPY1, 1))
         for inv in mod2._pycinternal__state_invs:
-            state_b_pre.append(self.convert_expr_to_btor2(inv.expr, 0))
-            state_b_post.append(self.convert_expr_to_btor2(inv.expr, 1))
+            state_b_pre.append(self.convert_expr_to_btor2(inv.expr, CPY2, 0))
+            state_b_post.append(self.convert_expr_to_btor2(inv.expr, CPY2, 1))
 
         # Output expressions
-        output_a = []
-        output_b = []
-        for inv in mod1._pycinternal__output_invs:
-            output_a.append(self.convert_expr_to_btor2(inv.expr, 1))
-        for inv in mod2._pycinternal__output_invs:
-            output_b.append(self.convert_expr_to_btor2(inv.expr, 1))
+        output_a = [
+            self.convert_expr_to_btor2(inv.expr, CPY1, 1)
+            for inv in mod1._pycinternal__output_invs
+        ]
+        output_b = [
+            self.convert_expr_to_btor2(inv.expr, CPY2, 1)
+            for inv in mod2._pycinternal__output_invs
+        ]
 
         # Refinement assumptions
         ref_assms_pre = []
         ref_assms_post = []
-        for (a_expr, b_expr) in rmap:
+        for (a_expr, b_expr) in rmap.mappings:
             ref_assms_pre.append(
-                self.convert_expr_to_btor2(a_expr, 0)
-                == self.convert_expr_to_btor2(b_expr, 0)
+                self.convert_expr_to_btor2(a_expr, CPY1, 0)
+                == self.convert_expr_to_btor2(b_expr, CPY2, 0)
             )
             ref_assms_post.append(
-                self.convert_expr_to_btor2(a_expr, 1)
-                == self.convert_expr_to_btor2(b_expr, 1)
+                self.convert_expr_to_btor2(a_expr, CPY1, 1)
+                == self.convert_expr_to_btor2(b_expr, CPY2, 1)
             )
 
         prev_a = []
@@ -140,14 +160,14 @@ class MMRVerifier:
         for signame, prev_sig in mod1._pycinternal__prev_signals.items():
             orig_sig = mod1._pycinternal__signals[signame]
             prev_a.append(
-                self.convert_expr_to_btor2(prev_sig, 1)
-                == self.convert_expr_to_btor2(orig_sig, 0)
+                self.convert_expr_to_btor2(prev_sig, CPY1, 1)
+                == self.convert_expr_to_btor2(orig_sig, CPY1, 0)
             )
         for signame, prev_sig in mod2._pycinternal__prev_signals.items():
             orig_sig = mod2._pycinternal__signals[signame]
             prev_b.append(
-                self.convert_expr_to_btor2(prev_sig, 1)
-                == self.convert_expr_to_btor2(orig_sig, 0)
+                self.convert_expr_to_btor2(prev_sig, CPY2, 1)
+                == self.convert_expr_to_btor2(orig_sig, CPY2, 0)
             )
 
         # Check input refinement
@@ -199,4 +219,6 @@ class MMRVerifier:
                 return False
             logging.debug("Inductive refinement passed for assertion %s", aexpr)
             self.slv.pop()
+
         logging.info("Inductive refinement passed")
+        return True

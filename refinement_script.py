@@ -1,7 +1,7 @@
 import logging
 
-from pycaliper.verif.mmrverifier import MMRVerifier
-from btor2ex import BoolectorSolver
+from pycaliper.verif.mmrverifier import RefinementMap
+from pycaliper.proofmanager import ProofManager
 
 from myspecs.refinement import FIFO, Counter
 
@@ -11,14 +11,17 @@ console = logging.StreamHandler()
 console.setLevel(logging.INFO)
 logging.getLogger("").addHandler(console)
 
+pm = ProofManager(cligui=True)
 
-fifo = FIFO()
-counter = Counter()
+fifo: FIFO = pm.mk_spec(FIFO, "fifo")
+counter: Counter = pm.mk_spec(Counter, "counter")
 
-refinement_map = [
-    (fifo.push, counter.add),
-    (fifo.pop, ~counter.add),
-    (fifo.wr_ptr - fifo.rd_ptr, counter.count),
-]
+refinement_map = RefinementMap(
+    mappings=[
+        (fifo.push, counter.add),
+        (fifo.pop, ~counter.add),
+        (fifo.wr_ptr - fifo.rd_ptr, counter.count),
+    ]
+)
 
-MMRVerifier(BoolectorSolver()).check_refinement(fifo, counter, rmap=refinement_map)
+pm.check_refinement(fifo, counter, refinement_map)

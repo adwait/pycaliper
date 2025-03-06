@@ -5,6 +5,7 @@ from pycaliper.per import SpecModule
 
 from pycaliper.pycconfig import DesignConfig
 from pycaliper.verif.btorverifier import BTORVerifier1Trace, BTORDesign, Design
+from pycaliper.verif.mmrverifier import MMRVerifier, RefinementMap
 
 from btor2ex.btor2ex.utils import parsewrapper
 
@@ -17,10 +18,28 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ProofResult:
+    result: bool
+
+
+@dataclass
+class OneTracePR(ProofResult):
     spec: str
     design: str
-    dc: str
-    result: bool
+    dc: DesignConfig
+
+
+@dataclass
+class TwoTracePR(ProofResult):
+    spec: str
+    design: str
+    dc: DesignConfig
+
+
+@dataclass
+class RefinementPR(ProofResult):
+    spec1: str
+    spec2: str
+    rmap: RefinementMap
 
 
 def mk_btordesign(name: str, filename: str):
@@ -58,7 +77,7 @@ class ProofManager:
             GUIPacket(
                 t=GUIPacket.T.NEW_SPEC,
                 sname=name,
-                file=spec.__module__,
+                file=f"{spec.__module__}.{spec.__name__}",
                 params=str(kwargs),
             )
         )
@@ -102,6 +121,32 @@ class ProofManager:
                 result=("PASS" if res else "FAIL"),
             )
         )
-        pr = ProofResult(spec.name, design.name, dc, res)
+        pr = OneTracePR(spec=spec.name, design=design.name, dc=dc, result=res)
+        self.proofs.append(pr)
+        return pr
+
+    def check_refinement(
+        self, spec1: SpecModule | str, spec2: SpecModule | str, rmap: RefinementMap
+    ):
+        if isinstance(spec1, str):
+            if spec1 not in self.specs:
+                raise ValueError(f"Spec {spec1} not found.")
+            spec1 = self.specs[spec1]
+        if isinstance(spec2, str):
+            if spec2 not in self.specs:
+                raise ValueError(f"Spec {spec2} not found.")
+            spec2 = self.specs[spec2]
+
+        res = MMRVerifier().check_refinement(spec1, spec2, rmap)
+        self._push_update(
+            GUIPacket(
+                t=GUIPacket.T.NEW_PROOF,
+                iden=str(len(self.proofs)),
+                sname=spec1.name,
+                dname=spec2.name,
+                result=("PASS" if res else "FAIL"),
+            )
+        )
+        pr = RefinementPR(spec1=spec1.name, spec2=spec2.name, rmap=rmap, result=res)
         self.proofs.append(pr)
         return pr

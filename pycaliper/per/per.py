@@ -1156,7 +1156,7 @@ class SpecModule:
                 submoduleattrs[obj.name] = obj.instantiate(path.add_level(obj.name))
 
         if self._pycinternal__clk is None:
-            logger.warn("No clock signal defined, defaulting to 'clk'")
+            logger.debug("No clock signal defined, defaulting to 'clk'")
             self._pycinternal__clk = Clock("clk")
 
         self._pycinternal__signals = sigattrs
