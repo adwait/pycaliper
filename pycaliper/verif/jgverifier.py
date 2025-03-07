@@ -37,7 +37,10 @@ class JGVerifier1Trace:
 
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
-            specmodule, filename=pyconfig.jgc.pycfile, onetrace=True, dc=pyconfig.dc
+            specmodule,
+            filename=pyconfig.jgc.pycfile_abspath(),
+            onetrace=True,
+            dc=pyconfig.dc,
         )
         self.candidates = svageni.holes
 
@@ -68,7 +71,7 @@ class JGVerifier2Trace:
         """
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
-            specmodule, filename=pyconfig.jgc.pycfile, dc=pyconfig.dc
+            specmodule, filename=pyconfig.jgc.pycfile_abspath(), dc=pyconfig.dc
         )
 
         loadscript(pyconfig.jgc.script)
@@ -100,7 +103,7 @@ class JGVerifier1TraceBMC:
 
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
-            specmodule, filename=pyconfig.jgc.pycfile, dc=pyconfig.dc
+            specmodule, filename=pyconfig.jgc.pycfile_abspath(), dc=pyconfig.dc
         )
         self.candidates = svageni.holes
 

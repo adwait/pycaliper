@@ -242,7 +242,7 @@ def get_pyconfig(args: PYCArgs) -> PYConfig:
         jasperc = JasperConfig(
             jdir=jgconfig["jasper"]["jdir"],
             script=jgconfig["jasper"]["script"],
-            pycfile=f'{jgconfig["jasper"]["jdir"]}/{jgconfig["jasper"]["pycfile"]}',
+            pycfile=jgconfig["jasper"]["pycfile"],
             context=jgconfig["jasper"]["context"],
             design_list=jgconfig["jasper"].get("design_list", "design.lst"),
             port=jgconfig["jasper"].get("port", 8080),

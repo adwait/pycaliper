@@ -201,7 +201,7 @@ class PERSynthesizer:
 
         self.svagen = SVAGen()
         self.svagen.create_pyc_specfile(
-            topmod, filename=self.pyconfig.jgc.pycfile, dc=self.pyconfig.dc
+            topmod, filename=self.pyconfig.jgc.pycfile_abspath(), dc=self.pyconfig.dc
         )
         self.candidates = self.svagen.holes
 

@@ -9,6 +9,9 @@ class JasperConfig(BaseModel):
     design_list: str = "design.lst"
     port: int = 8080
 
+    def pycfile_abspath(self):
+        return f"{self.jdir}/{self.pycfile}"
+
 
 class DesignConfig(BaseModel):
     cpy1: str = "a"

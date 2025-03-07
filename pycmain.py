@@ -165,7 +165,9 @@ def svagen_main(
     pyconfig, tmgr, module = start(PYCTask.SVAGEN, args)
     module.instantiate()
     svagen = SVAGen()
-    svagen.create_pyc_specfile(module, filename=pyconfig.jgc.pycfile, dc=pyconfig.dc)
+    svagen.create_pyc_specfile(
+        module, filename=pyconfig.jgc.pycfile_abspath(), dc=pyconfig.dc
+    )
 
 
 if __name__ == "__main__":
