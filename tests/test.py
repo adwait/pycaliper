@@ -69,7 +69,7 @@ class TestVerifier(unittest.TestCase):
             params="",
             sdir="",
             onetrace=True,
-            bmc=True,
+            bmc="",
         )
         return start(PYCTask.VERIFBMC, args)
 
@@ -140,20 +140,20 @@ class BTORInterfaceTest(unittest.TestCase):
 
 
 class SymbolicSimulator(unittest.TestCase):
-    def gen_test(self, specpath, jgcpath):
+    def gen_test(self, specpath, jgcpath, bmc):
         args = PYCArgs(
             specpath=specpath,
             jgcpath=jgcpath,
             params="",
             sdir="",
             onetrace=True,
-            bmc=True,
+            bmc=bmc,
         )
         return start(PYCTask.VERIFBMC, args)
 
     def test_adder(self):
         (pyconfig, tmgr, module) = self.gen_test(
-            "specs/adder", "designs/adder/config.json"
+            "specs/adder.adder", "designs/adder/config.json", "simstep"
         )
         verifier = JGVerifier1TraceBMC()
         logger.debug("Running BMC verification.")
