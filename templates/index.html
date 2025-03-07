@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Main App with GUI in Thread</title>
+    <!-- Include Socket.IO client script from a CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+    <script type="text/javascript">
+      document.addEventListener("DOMContentLoaded", function() {
+        // Connect to the Socket.IO server.
+        var socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
+
+        socket.on('connect', function() {
+          console.log("Connected to the Socket.IO server!");
+        });
+
+        // Listen for incoming data updates.
+        socket.on('data_update', function(data) {
+          console.log("Received update:", data);
+
+          var updateEl = document.createElement("div");
+          updateEl.classList.add("update");
+          updateEl.innerHTML = "<strong>Update #" + data.message + "</strong><br>";
+
+          // Insert the new update at the start of the updates container.
+          var container = document.getElementById("updates");
+          container.insertBefore(updateEl, container.firstChild);
+        });
+      });
+    </script>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; }
+      .update {
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        background-color: #f9f9f9;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Main Application with GUI in a Separate Thread</h1>
+    <div id="updates">
+      <!-- Real-time updates will display here -->
+    </div>
+  </body>
+</html>
