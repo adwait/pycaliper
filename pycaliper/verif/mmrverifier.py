@@ -4,6 +4,7 @@ import logging
 import sys
 
 from dataclasses import dataclass
+from typing import Callable
 
 from btor2ex import BTORSolver, BTORSort, BoolectorSolver
 from pycaliper.per import Expr as PYCExpr
@@ -24,7 +25,7 @@ class FunctionalRefinementMap(RefinementMap):
     mappings: list[tuple[Logic, PYCExpr]]
 
 
-class MMRVerifier:
+class RefinementVerifier:
     def __init__(self, slv: BTORSolver = BoolectorSolver()):
         self.slv = slv
         self.oplut = slv.oplut()
@@ -98,6 +99,14 @@ class MMRVerifier:
         assm.Dump()
         assm.Dump("smt2")
         input("\nPRESS ENTER TO CONTINUE")
+
+
+class MMRVerifier(RefinementVerifier):
+    def __init__(self, slv: BTORSolver = BoolectorSolver()):
+        self.slv = slv
+        self.oplut = slv.oplut()
+        # Variable map (dynamic and needs to be reset for each check)
+        self.varmap = {}
 
     def check_refinement(self, mod1: SpecModule, mod2: SpecModule, rmap: RefinementMap):
         # Reset the global symbolic state
@@ -185,7 +194,7 @@ class MMRVerifier:
             # self.dump_and_wait(self.slv.not_(asrt))
             self.slv.mk_assert(self.slv.not_(asrt))
             if self.slv.check_sat():
-                logging.error("Input refinement failed for assertion %s", aexpr)
+                logging.info("Input refinement failed for assertion %s", aexpr)
                 logging.debug(self.slv.get_model())
                 return False
             logging.debug("Input refinement passed for assertion %s", aexpr)
@@ -214,11 +223,86 @@ class MMRVerifier:
             # self.dump_and_wait(self.slv.not_(asrt))
             self.slv.mk_assert(self.slv.not_(asrt))
             if self.slv.check_sat():
-                logging.error("Inductive refinement failed for assertion %s", aexpr)
+                logging.info("Inductive refinement failed for assertion %s", aexpr)
                 logging.debug(self.slv.get_model())
                 return False
             logging.debug("Inductive refinement passed for assertion %s", aexpr)
             self.slv.pop()
 
         logging.info("Inductive refinement passed")
+        return True
+
+
+class BSRVerifier(RefinementVerifier):
+    def __init__(self, slv: BTORSolver = BoolectorSolver()):
+        super().__init__(slv)
+
+    def check_refinement(self, mod: SpecModule, bs1: str | Callable, bs2: str):
+        # Reset the global symbolic state
+        self.reset()
+        CPY1 = "cpy1"
+
+        # If bs1 is a method, get the name
+        if not isinstance(bs1, str):
+            bs1 = bs1.__name__
+        if not isinstance(bs2, str):
+            bs2 = bs2.__name__
+
+        assert mod.is_instantiated(), "Module 1 is not instantiated"
+        assert (
+            bs1 in mod._pycinternal__simsteps
+        ), f"Simulation schedule {bs1} not found in Module {mod.name}"
+        assert (
+            bs2 in mod._pycinternal__simsteps
+        ), f"Simulation schedule {bs2} not found in Module {mod.name}"
+
+        # Schedule 1
+        sim1 = mod._pycinternal__simsteps[bs1]
+        # Schedule 2
+        sim2 = mod._pycinternal__simsteps[bs2]
+
+        # Generate the assumptions and assertions
+        # Input expressions
+        assms_all = []
+        for i, step in enumerate(sim1.steps):
+            assms_all.extend(
+                [
+                    self.convert_expr_to_btor2(inv, CPY1, i)
+                    for inv in step._pycinternal__assume
+                ]
+            )
+
+        assrts_all = []
+        for i, step in enumerate(sim2.steps):
+            assrts_all.extend(
+                [
+                    self.convert_expr_to_btor2(inv, CPY1, i)
+                    for inv in step._pycinternal__assume
+                ]
+            )
+
+        # TODO: Prev not handled
+        assert len(mod._pycinternal__prev_signals) == 0, "Prev signals not handled"
+
+        for assm in assms_all:
+            # self.dump_and_wait(assm)
+            self.slv.mk_assert(assm)
+
+        # Check input refinement
+        logging.debug("Checking input refinement")
+        for asrt in assrts_all:
+
+            self.slv.push()
+            # self.dump_and_wait(self.slv.not_(asrt))
+            self.slv.mk_assert(self.slv.not_(asrt))
+            if self.slv.check_sat():
+                logging.info(
+                    "Bounded simulation refinement failed for assertion %s", asrt
+                )
+                logging.debug(self.slv.get_model())
+                return False
+            logging.debug("Bounded simulation refinement passed for assertion %s", asrt)
+            self.slv.pop()
+
+        logging.info("Bounded simulation refinement passed")
         return True

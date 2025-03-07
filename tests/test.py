@@ -18,11 +18,12 @@ from pycaliper.svagen import SVAGen
 from pycaliper.btorinterface.pycbtorsymex import DesignConfig
 from pycaliper.verif.btorverifier import BTORVerifier2Trace
 from pycaliper.verif.jgverifier import JGVerifier1TraceBMC, JGVerifier1Trace
+from pycaliper.verif.mmrverifier import BSRVerifier
 
 from specs.regblock import regblock
 from specs.array_nonzerobase import array_nonzerobase, array_nonzerobase2
 from specs.counter import counter
-from specs.adder import adder
+from specs.adder import adder, refiner_module
 
 h1 = logging.StreamHandler(sys.stdout)
 h1.setLevel(logging.INFO)
@@ -176,6 +177,15 @@ class ReprTest(unittest.TestCase):
             addermodstr,
             "Assume statement not present in repr",
         )
+
+
+class RefinementVerifierTest(unittest.TestCase):
+    def test_bsr(self):
+        rm = refiner_module()
+        rm.instantiate()
+        bsr = BSRVerifier()
+        res = bsr.check_refinement(rm, rm.simsched1, rm.simsched2)
+        print(res)
 
 
 if __name__ == "__main__":
