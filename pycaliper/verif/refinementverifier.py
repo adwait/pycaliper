@@ -100,15 +100,17 @@ class RefinementVerifier:
         assm.Dump("smt2")
         input("\nPRESS ENTER TO CONTINUE")
 
+    def check_mm_refinement(
+        self, mod1: SpecModule, mod2: SpecModule, rmap: RefinementMap
+    ):
+        """
+        Check module-to-module refinement between two modules under a certain refinement map.
 
-class MMRVerifier(RefinementVerifier):
-    def __init__(self, slv: BTORSolver = BoolectorSolver()):
-        self.slv = slv
-        self.oplut = slv.oplut()
-        # Variable map (dynamic and needs to be reset for each check)
-        self.varmap = {}
-
-    def check_refinement(self, mod1: SpecModule, mod2: SpecModule, rmap: RefinementMap):
+        Args:
+            mod1: The first module
+            mod2: The second module
+            rmap: The refinement map
+        """
         # Reset the global symbolic state
         self.reset()
         CPY1 = "cpy1"
@@ -232,12 +234,18 @@ class MMRVerifier(RefinementVerifier):
         logging.info("Inductive refinement passed")
         return True
 
+    def check_ss_refinement(
+        self, mod: SpecModule, bs1: str | Callable, bs2: str, flip_props: bool = False
+    ):
+        """
+        Check bounded simulation refinement between two simulation schedules.
 
-class BSRVerifier(RefinementVerifier):
-    def __init__(self, slv: BTORSolver = BoolectorSolver()):
-        super().__init__(slv)
-
-    def check_refinement(self, mod: SpecModule, bs1: str | Callable, bs2: str):
+        Args:
+            mod: The module to check refinement for
+            bs1: The first simulation schedule
+            bs2: The second simulation schedule
+            flip_props: If True, turn assertions from the first schedule into assumptions
+        """
         # Reset the global symbolic state
         self.reset()
         CPY1 = "cpy1"
@@ -264,13 +272,22 @@ class BSRVerifier(RefinementVerifier):
         # Generate the assumptions and assertions
         # Input expressions
         assms_all = []
-        for i, step in enumerate(sim1.steps):
-            assms_all.extend(
-                [
-                    self.convert_expr_to_btor2(inv, CPY1, i)
-                    for inv in step._pycinternal__assume
-                ]
-            )
+        if not flip_props:
+            for i, step in enumerate(sim1.steps):
+                assms_all.extend(
+                    [
+                        self.convert_expr_to_btor2(inv, CPY1, i)
+                        for inv in step._pycinternal__assume
+                    ]
+                )
+        else:
+            for i, step in enumerate(sim1.steps):
+                assms_all.extend(
+                    [
+                        self.convert_expr_to_btor2(inv, CPY1, i)
+                        for inv in step._pycinternal__assume + step._pycinternal__assert
+                    ]
+                )
 
         assrts_all = []
         for i, step in enumerate(sim2.steps):

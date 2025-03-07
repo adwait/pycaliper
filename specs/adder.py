@@ -40,20 +40,3 @@ class adder(SpecModule):
             )
 
         self.get_reset_seq(i)
-
-
-class refiner_module(SpecModule):
-    def __init__(self, name="", **kwargs):
-        super().__init__(name, **kwargs)
-        self.sig1 = Logic(8)
-        self.sig2 = Logic(8)
-
-    @unroll(3)
-    def simsched1(self, i: int = 0) -> None:
-        if i < 3:
-            self.pycassume(self.sig1 == self.sig2)
-
-    @unroll(4)
-    def simsched2(self, i: int = 0) -> None:
-        if i < 3:
-            self.pycassume(self.sig1 <= self.sig2)
