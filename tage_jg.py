@@ -2,7 +2,7 @@ import sys
 import logging
 from time import time
 
-from pycaliper.pycmanager import PYCArgs, setup_pyc_tmgr_jg
+from pycaliper.pycmanager import PYCArgs, setup_all
 from pycaliper.verif.jgverifier import JGVerifier1Trace
 
 from myspecs.tage import boundary_spec, tage_config
@@ -20,7 +20,7 @@ def test_main(bw):
         specpath="myspecs/tage.boundary_spec",
         jgcpath="designs/tage/config_boundary.json",
     )
-    is_conn, pyconfig, tmgr = setup_pyc_tmgr_jg(args)
+    is_conn, pyconfig, tmgr = setup_all(args)
 
     time_start = time()
 

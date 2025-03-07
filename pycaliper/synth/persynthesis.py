@@ -69,12 +69,12 @@ class SynthesisTree:
 class PERSynthesizer:
     def __init__(
         self,
-        psconf: PYConfig,
+        pyconfig: PYConfig,
         strategy: IISStrategy = SeqStrategy(),
         fuelbudget: int = 3,
         stepbudget: int = 10,
     ) -> None:
-        self.psc = psconf
+        self.pyconfig = pyconfig
         self.svagen = None
         self.candidates: dict[str, PERHole] = {}
 
@@ -101,11 +101,11 @@ class PERSynthesizer:
             for cand in self.candidates:
                 if cand not in self.synstate.asrts:
                     self.solvecalls += 1
-                    if is_pass(prove(self.psc.context, cand)):
+                    if is_pass(prove(self.pyconfig.jgc.context, cand)):
                         added = True
                         self.synstate.add_asrt(cand)
                         if self.synstate.add_secondary_assm(cand):
-                            enable_assm(self.psc.context, cand)
+                            enable_assm(self.pyconfig.jgc.context, cand)
                         logger.debug(f"Added assertion {cand} to synthesis node")
                         break
 
@@ -114,7 +114,7 @@ class PERSynthesizer:
         self.synstate = self.synstate.children[cand]
         logger.debug(f"Dived to new state: {self.synstate} on candidate: {cand}")
         self.depth += 1
-        enable_assm(self.psc.context, cand)
+        enable_assm(self.pyconfig.jgc.context, cand)
         logger.debug(
             f"Saturating curr. synstate: {self.synstate}, with assms: {self.synstate.assms}"
         )
@@ -134,7 +134,7 @@ class PERSynthesizer:
                 + f"inheritance: {cand}, and secondaries: {secondaries}"
             )
             for c in [cand] + secondaries:
-                disable_assm(self.psc.context, c)
+                disable_assm(self.pyconfig.jgc.context, c)
             self.depth -= 1
             return True
         else:
@@ -147,7 +147,7 @@ class PERSynthesizer:
         if not self.synstate.checked:
             self.synstate.checked = True
             self.solvecalls += 1
-            return is_pass(prove_out_induction_2t(self.psc.context))
+            return is_pass(prove_out_induction_2t(self.pyconfig.jgc.context))
         return False
 
     def _synthesize(self, candidate_order):
@@ -201,7 +201,7 @@ class PERSynthesizer:
 
         self.svagen = SVAGen()
         self.svagen.create_pyc_specfile(
-            topmod, filename=self.psc.pycfile, dc=self.psc.dc
+            topmod, filename=self.pyconfig.jgc.pycfile, dc=self.pyconfig.dc
         )
         self.candidates = self.svagen.holes
 
@@ -216,9 +216,11 @@ class PERSynthesizer:
 
         for i in range(retries):
             # Load the script
-            loadscript(self.psc.script)
+            loadscript(self.pyconfig.jgc.script)
             # Enable and disable the right assumptions
-            set_assm_induction_2t(self.psc.context, self.svagen.property_context)
+            set_assm_induction_2t(
+                self.pyconfig.jgc.context, self.svagen.property_context
+            )
 
             candidate_order = self.strategy.get_candidate_order(
                 list(self.candidates.keys()),

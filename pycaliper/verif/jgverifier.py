@@ -37,15 +37,15 @@ class JGVerifier1Trace:
 
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
-            specmodule, filename=pyconfig.pycfile, onetrace=True, dc=pyconfig.dc
+            specmodule, filename=pyconfig.jgc.pycfile, onetrace=True, dc=pyconfig.dc
         )
         self.candidates = svageni.holes
 
-        loadscript(pyconfig.script)
+        loadscript(pyconfig.jgc.script)
         # Enable the assumptions for 1 trace verification
-        set_assm_induction_1t(pyconfig.context, svageni.property_context)
+        set_assm_induction_1t(pyconfig.jgc.context, svageni.property_context)
 
-        res = is_pass(prove_out_induction_1t(pyconfig.context))
+        res = is_pass(prove_out_induction_1t(pyconfig.jgc.context))
         res_str = "SAFE" if res else "UNSAFE"
         logger.info(f"One trace verification result: {res_str}")
         return res
@@ -68,14 +68,14 @@ class JGVerifier2Trace:
         """
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
-            specmodule, filename=pyconfig.pycfile, dc=pyconfig.dc
+            specmodule, filename=pyconfig.jgc.pycfile, dc=pyconfig.dc
         )
 
-        loadscript(pyconfig.script)
+        loadscript(pyconfig.jgc.script)
         # Enable the assumptions for 2 trace verification
-        set_assm_induction_2t(pyconfig.context, svageni.property_context)
+        set_assm_induction_2t(pyconfig.jgc.context, svageni.property_context)
 
-        res = is_pass(prove_out_induction_2t(pyconfig.context))
+        res = is_pass(prove_out_induction_2t(pyconfig.jgc.context))
         res_str = "SAFE" if res else "UNSAFE"
         logger.info("Two trace verification result: %s", res_str)
         return res
@@ -100,17 +100,19 @@ class JGVerifier1TraceBMC:
 
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
-            specmodule, filename=pyconfig.pycfile, dc=pyconfig.dc
+            specmodule, filename=pyconfig.jgc.pycfile, dc=pyconfig.dc
         )
         self.candidates = svageni.holes
 
-        loadscript(pyconfig.script)
+        loadscript(pyconfig.jgc.script)
         # Enable the assumptions for 1 trace verification
-        set_assm_bmc(pyconfig.context, svageni.property_context, schedule)
+        set_assm_bmc(pyconfig.jgc.context, svageni.property_context, schedule)
 
         results = [
             is_pass(r)
-            for r in prove_out_bmc(pyconfig.context, svageni.property_context, schedule)
+            for r in prove_out_bmc(
+                pyconfig.jgc.context, svageni.property_context, schedule
+            )
         ]
         results_str = "\n\t".join(
             [

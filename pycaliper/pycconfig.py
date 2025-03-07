@@ -1,9 +1,21 @@
 from pydantic import BaseModel
 
 
+class JasperConfig(BaseModel):
+    jdir: str = ""
+    script: str = ""
+    pycfile: str = ""
+    context: str = ""
+    design_list: str = "design.lst"
+    port: int = 8080
+
+
 class DesignConfig(BaseModel):
     cpy1: str = "a"
     cpy2: str = "b"
+    lang: str = "sv12"
+    topmod: str = ""
+    clk: str = "clk"
 
 
 class PYConfig(BaseModel):
@@ -12,18 +24,10 @@ class PYConfig(BaseModel):
     # Saving directory
     sdir: str = ""
 
-    # Jasper directory (relative to pycaliper dir)
-    jdir: str = ""
     # Is this a mock run (without Jasper access)?
     mock: bool = False
-    # Script to load in Jasper (relative to Jasper dir)
-    script: str = ""
-    # Verification context to use in Jasper
-    context: str = ""
-    # PyCaliper SVA filepath to use (relative to pycaliper dir)
-    pycfile: str = ""
-    # Port to use
-    port: int = 8080
+    # Jasper configuration
+    jgc: JasperConfig = JasperConfig()
 
     # Specification location
     pycspec: str = ""

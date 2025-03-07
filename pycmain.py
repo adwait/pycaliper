@@ -34,7 +34,9 @@ app = typer.Typer(help=DESCRIPTION)
 
 @app.command("verif")
 def verif_main(
-    specpath: Annotated[str, Argument(help="Path to the PYC config file")] = "",
+    specpath: Annotated[
+        str, Argument(help="Path to the PyCaliper specification class")
+    ] = "",
     # Allow providing a configuration for Jasper
     jgcpath: Annotated[
         str, Option("-j", "--jgc", help="Path to the Jasper config file")
@@ -58,6 +60,7 @@ def verif_main(
     args = PYCArgs(
         specpath=specpath,
         jgcpath=jgcpath,
+        dcpath=dcpath,
         params=params,
         sdir=sdir,
         onetrace=onetrace,
@@ -65,26 +68,28 @@ def verif_main(
     )
     if bmc == "":
         if onetrace:
-            pconfig, tmgr, module = start(PYCTask.VERIF1T, args)
+            pyconfig, tmgr, module = start(PYCTask.VERIF1T, args)
             verifier = JGVerifier1Trace()
             logger.debug("Running single trace verification.")
         else:
-            pconfig, tmgr, module = start(PYCTask.VERIF2T, args)
+            pyconfig, tmgr, module = start(PYCTask.VERIF2T, args)
             verifier = JGVerifier2Trace()
             logger.debug("Running two trace verification.")
         module.instantiate()
-        verifier.verify(module, pconfig)
+        verifier.verify(module, pyconfig)
     else:
-        pconfig, tmgr, module = start(PYCTask.VERIFBMC, args)
+        pyconfig, tmgr, module = start(PYCTask.VERIFBMC, args)
         verifier = JGVerifier1TraceBMC()
         logger.debug("Running BMC verification.")
         module.instantiate()
-        verifier.verify(module, bmc, pconfig)
+        verifier.verify(module, pyconfig, bmc)
 
 
 @app.command("persynth")
 def persynth_main(
-    specpath: Annotated[str, Argument(help="Path to the PYC config file")] = "",
+    specpath: Annotated[
+        str, Argument(help="Path to the PyCaliper specification class")
+    ] = "",
     # Allow providing a configuration for Jasper
     jgcpath: Annotated[
         str, Option("-j", "--jgc", help="Path to the Jasper config file")
@@ -111,8 +116,10 @@ def persynth_main(
     # Allow using --stepbudget
     stepbudget: Annotated[int, Option(help="Step budget for synthesis")] = 10,
 ):
-    args = PYCArgs(specpath=specpath, jgcpath=jgcpath, params=params, sdir=sdir)
-    pconfig, tmgr, module = start(PYCTask.PERSYNTH, args)
+    args = PYCArgs(
+        specpath=specpath, jgcpath=jgcpath, dcpath=dcpath, params=params, sdir=sdir
+    )
+    pyconfig, tmgr, module = start(PYCTask.PERSYNTH, args)
 
     match strategy:
         case "seq":
@@ -125,7 +132,7 @@ def persynth_main(
             logger.warning("Invalid strategy, using default strategy.")
             strat = SeqStrategy()
 
-    synthesizer = PERSynthesizer(pconfig, strat, fuelbudget, stepbudget)
+    synthesizer = PERSynthesizer(pyconfig, strat, fuelbudget, stepbudget)
     module.instantiate()
     finalmod = synthesizer.synthesize(module, retries)
 
@@ -135,7 +142,9 @@ def persynth_main(
 
 @app.command("svagen")
 def svagen_main(
-    specpath: Annotated[str, Argument(help="Path to the PYC config file")] = "",
+    specpath: Annotated[
+        str, Argument(help="Path to the PyCaliper specification class")
+    ] = "",
     # Allow providing a configuration for Jasper
     jgcpath: Annotated[
         str, Option("-j", "--jgc", help="Path to the Jasper config file")
@@ -153,10 +162,10 @@ def svagen_main(
     args = PYCArgs(
         specpath=specpath, jgcpath=jgcpath, dcpath=dcpath, params=params, sdir=sdir
     )
-    pconfig, tmgr, module = start(PYCTask.SVAGEN, args)
+    pyconfig, tmgr, module = start(PYCTask.SVAGEN, args)
     module.instantiate()
     svagen = SVAGen()
-    svagen.create_pyc_specfile(module, filename=pconfig.pycfile, dc=pconfig.dc)
+    svagen.create_pyc_specfile(module, filename=pyconfig.jgc.pycfile, dc=pyconfig.dc)
 
 
 if __name__ == "__main__":

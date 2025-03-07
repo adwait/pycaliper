@@ -2,7 +2,7 @@ import sys
 import logging
 from time import time
 
-from pycaliper.pycmanager import PYCArgs, setup_pyc_tmgr_jg
+from pycaliper.pycmanager import PYCArgs, setup_all
 from pycaliper.synth.persynthesis import (
     PERSynthesizer,
     SeqStrategy,
@@ -26,7 +26,7 @@ def run_once(k_: int, strategy_: str, fuelbudget_=3, retries_=10, stepbudget_=10
         jgcpath="designs/dawg/config_nru.json",
         params="MODE=0,k=4",
     )
-    is_connected, pyconfig, tmgr = setup_pyc_tmgr_jg(args)
+    is_connected, pyconfig, tmgr = setup_all(args)
 
     assert is_connected, "JasperGold is not connected."
 

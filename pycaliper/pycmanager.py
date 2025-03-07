@@ -13,9 +13,10 @@ from jsonschema.exceptions import ValidationError
 
 from pycaliper.jginterface import jasperclient as jgc
 from pycaliper.jginterface.jgoracle import setjwd
+from pycaliper.jginterface.jgsetup import setup_jasper
 
 from pydantic import BaseModel
-from .pycconfig import PYConfig, DesignConfig
+from .pycconfig import PYConfig, DesignConfig, JasperConfig
 from .per.per import SpecModule
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ class PYCArgs(BaseModel):
     sdir: str = ""
     tdir: str = ""
     onetrace: bool = False
-    bmc: bool = False
+    bmc: str = ""
 
 
 class PYCManager:
@@ -135,6 +136,8 @@ JG_CONFIG_SCHEMA = {
                 "pycfile": {"type": "string"},
                 # Proof node context
                 "context": {"type": "string"},
+                # Design list file
+                "design_list": {"type": "string"},
                 # Port number to connect to Jasper server
                 "port": {"type": "integer"},
             },
@@ -151,8 +154,11 @@ D_CONFIG_SCHEMA = {
     "properties": {
         "cpy1": {"type": "string"},
         "cpy2": {"type": "string"},
+        "topmod": {"type": "string"},
+        "lang": {"type": "string"},
+        "clk": {"type": "string"},
     },
-    "required": ["cpy1"],
+    "required": ["cpy1", "topmod"],
     "additionalProperties": False,
 }
 
@@ -213,8 +219,8 @@ def mock_or_connect(pyconfig: PYConfig) -> bool:
         logger.info("Running in mock mode.")
         return False
     else:
-        jgc.connect_tcp("localhost", pyconfig.port)
-        setjwd(pyconfig.jdir)
+        jgc.connect_tcp("localhost", pyconfig.jgc.port)
+        setjwd(pyconfig.jgc.jdir)
         return True
 
 
@@ -233,12 +239,16 @@ def get_pyconfig(args: PYCArgs) -> PYConfig:
                 f"Please check schema:\n{json.dumps(JG_CONFIG_SCHEMA, indent=4, sort_keys=True, separators=(',', ': '))}"
             )
             sys.exit(1)
+        jasperc = JasperConfig(
+            jdir=jgconfig["jasper"]["jdir"],
+            script=jgconfig["jasper"]["script"],
+            pycfile=f'{jgconfig["jasper"]["jdir"]}/{jgconfig["jasper"]["pycfile"]}',
+            context=jgconfig["jasper"]["context"],
+            design_list=jgconfig["jasper"].get("design_list", "design.lst"),
+            port=jgconfig["jasper"].get("port", 8080),
+        )
     else:
-        jgconfig = {}
-
-    jasperc = jgconfig.get(
-        "jasper", {"jdir": "", "script": "", "context": "", "pycfile": ""}
-    )
+        jasperc = JasperConfig()
 
     if args.dcpath != "":
         with open(args.dcpath, "r") as f:
@@ -252,7 +262,11 @@ def get_pyconfig(args: PYCArgs) -> PYConfig:
             )
             sys.exit(1)
         designc = DesignConfig(
-            cpy1=dconfig.get("cpy1", "a"), cpy2=dconfig.get("cpy2", "b")
+            cpy1=dconfig["cpy1"],
+            cpy2=dconfig.get("cpy2", "b"),
+            lang=dconfig.get("lang", "sv12"),
+            topmod=dconfig["topmod"],
+            clk=dconfig.get("clk", "clk"),
         )
     else:
         designc = DesignConfig()
@@ -260,14 +274,10 @@ def get_pyconfig(args: PYCArgs) -> PYConfig:
     return PYConfig(
         # Working directory
         sdir=args.sdir,
-        # Jasper configuration
-        jdir=jasperc["jdir"],
         # Is this a mock run
         mock=(args.jgcpath == ""),
-        script=jasperc["script"],
-        context=jasperc["context"],
-        pycfile=f'{jasperc["jdir"]}/{jasperc["pycfile"]}',
-        port=jasperc.get("port", 8080),
+        # Jasper configuration
+        jgc=jasperc,
         # Spec config
         pycspec=get_specmodname(args.specpath),
         # Trace directory
@@ -277,9 +287,10 @@ def get_pyconfig(args: PYCArgs) -> PYConfig:
     )
 
 
-def setup_pyc_tmgr_jg(args: PYCArgs) -> tuple[bool, PYConfig, PYCManager]:
+def setup_all(args: PYCArgs) -> tuple[bool, PYConfig, PYCManager]:
     pyconfig = get_pyconfig(args)
     tmgr = PYCManager(pyconfig)
+    setup_jasper(pyconfig.dc, pyconfig.jgc)
     is_connected = mock_or_connect(pyconfig)
 
     return is_connected, pyconfig, tmgr
@@ -287,7 +298,7 @@ def setup_pyc_tmgr_jg(args: PYCArgs) -> tuple[bool, PYConfig, PYCManager]:
 
 def start(task: PYCTask, args: PYCArgs) -> tuple[PYConfig, PYCManager, SpecModule]:
 
-    is_connected, pyconfig, tmgr = setup_pyc_tmgr_jg(args)
+    is_connected, pyconfig, tmgr = setup_all(args)
 
     module = create_module(args.specpath, args)
     assert module is not None, f"SpecModule {args.specpath} not found."
