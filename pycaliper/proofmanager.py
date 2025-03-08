@@ -1,0 +1,225 @@
+from typing import Callable
+
+from pycaliper.pycgui import GUIPacket, WebGUI, RichGUI
+
+import btoropt
+from pycaliper.per import SpecModule
+
+from pycaliper.pycconfig import DesignConfig
+from pycaliper.verif.btorverifier import BTORVerifier1Trace, BTORDesign, Design
+from pycaliper.verif.refinementverifier import RefinementMap, RefinementVerifier
+
+from btor2ex.btor2ex.utils import parsewrapper
+
+from dataclasses import dataclass
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ProofResult:
+    result: bool
+
+
+@dataclass
+class OneTracePR(ProofResult):
+    spec: str
+    design: str
+    dc: DesignConfig
+
+    def __str__(self) -> str:
+        return "OneTrace(%s, %s, %s)" % (self.spec, self.design, self.dc)
+
+
+@dataclass
+class TwoTracePR(ProofResult):
+    spec: str
+    design: str
+    dc: DesignConfig
+
+    def __str__(self) -> str:
+        return "TwoTrace(%s, %s, %s)" % (self.spec, self.design, self.dc)
+
+
+@dataclass
+class MMRefinementPR(ProofResult):
+    spec1: str
+    spec2: str
+    rmap: RefinementMap
+
+    def __str__(self) -> str:
+        return "MMRefinement(%s, %s, %s)" % (self.spec1, self.spec2, self.rmap)
+
+
+@dataclass
+class SSRefinementPR(ProofResult):
+    spec: str
+    sched1: str
+    sched2: str
+    flip: bool
+
+    def __str__(self) -> str:
+        return "SSRefinement(%s, %s, %s, %s)" % (
+            self.spec,
+            self.sched1,
+            self.sched2,
+            self.flip,
+        )
+
+
+def mk_btordesign(name: str, filename: str):
+    prgm = btoropt.parse(parsewrapper(filename))
+    return BTORDesign(name, prgm)
+
+
+class ProofManager:
+    def __init__(self, webgui=False, cligui=False) -> None:
+        self.proofs: list[ProofResult] = []
+        self.designs: dict[str, Design] = {}
+        self.specs: dict[str, SpecModule] = {}
+        if webgui:
+            self.gui = WebGUI()
+            self.gui.run()
+        elif cligui:
+            self.gui = RichGUI()
+            self.gui.run()
+        else:
+            self.gui = None
+
+    def _push_update(self, data: GUIPacket):
+        if self.gui:
+            self.gui.push_update(data)
+
+    def mk_spec(self, spec: SpecModule.__class__, name: str, **kwargs):
+        if name in self.specs:
+            logger.warning(f"Spec {name} already exists.")
+
+        new_spec: SpecModule = spec(name, **kwargs)
+        new_spec.instantiate()
+        self.specs[name] = new_spec
+        new_spec.name = name
+        self._push_update(
+            GUIPacket(
+                t=GUIPacket.T.NEW_SPEC,
+                sname=name,
+                file=f"{spec.__module__}.{spec.__name__}",
+                params=str(kwargs),
+            )
+        )
+        return new_spec
+
+    def mk_btor_design_from_file(self, file: str, name: str) -> BTORDesign:
+        if name in self.designs:
+            logger.warning(f"Design {name} already exists.")
+        prgm = btoropt.parse(parsewrapper(file), gui=self.gui)
+        des = BTORDesign(name, prgm)
+        self.designs[name] = des
+
+        self._push_update(
+            GUIPacket(t=GUIPacket.T.NEW_DESIGN, dname=name, file=file, params=None)
+        )
+        return des
+
+    def mk_btor_proof_one_trace(
+        self,
+        spec: SpecModule | str,
+        design: Design | str,
+        dc: DesignConfig = DesignConfig(),
+    ) -> ProofResult:
+        if isinstance(spec, str):
+            if spec not in self.specs:
+                raise ValueError(f"Spec {spec} not found.")
+            spec = self.specs[spec]
+        if isinstance(design, str):
+            if design not in self.designs:
+                raise ValueError(f"Design {design} not found.")
+            design = self.designs[design]
+
+        res = BTORVerifier1Trace(self.gui).verify(spec, design, dc)
+
+        self._push_update(
+            GUIPacket(
+                t=GUIPacket.T.NEW_PROOF,
+                iden=str(len(self.proofs)),
+                sname=spec.name,
+                dname=design.name,
+                result=("PASS" if res else "FAIL"),
+            )
+        )
+        pr = OneTracePR(spec=spec.name, design=design.name, dc=dc, result=res)
+        self.proofs.append(pr)
+        return pr
+
+    def check_mm_refinement(
+        self, spec1: SpecModule | str, spec2: SpecModule | str, rmap: RefinementMap
+    ):
+        if isinstance(spec1, str):
+            if spec1 not in self.specs:
+                raise ValueError(f"Spec {spec1} not found.")
+            spec1 = self.specs[spec1]
+        if isinstance(spec2, str):
+            if spec2 not in self.specs:
+                raise ValueError(f"Spec {spec2} not found.")
+            spec2 = self.specs[spec2]
+
+        res = RefinementVerifier().check_mm_refinement(spec1, spec2, rmap)
+        pr = MMRefinementPR(spec1=spec1.name, spec2=spec2.name, rmap=rmap, result=res)
+        self.proofs.append(pr)
+
+        self._push_update(
+            GUIPacket(
+                t=GUIPacket.T.NEW_PROOF,
+                iden=str(len(self.proofs)),
+                proofterm=str(pr),
+                result=("PASS" if res else "FAIL"),
+            )
+        )
+
+        return pr
+
+    def check_ss_refinement(
+        self,
+        spec: SpecModule | str,
+        sched1: Callable | str,
+        sched2: Callable | str,
+        flip: bool = False,
+    ) -> ProofResult:
+        """
+        Check if bounded schedule sched1 refines sched2. If flip is True, then the assertions are flipped in sched1.
+
+        Args:
+            spec (SpecModule | str): The spec to use.
+            sched1 (Callable | str): The first schedule to check.
+            sched2 (Callable | str): The second schedule to check.
+            flip (bool, optional): Flip the assertions in sched1. Defaults to False.
+        """
+        if isinstance(spec, str):
+            if spec not in self.specs:
+                raise ValueError(f"Spec {spec} not found.")
+            spec = self.specs[spec]
+
+        sched1_name = sched1.__name__ if callable(sched1) else sched1
+        sched2_name = sched2.__name__ if callable(sched2) else sched2
+
+        res = RefinementVerifier().check_ss_refinement(spec, sched1, sched2, flip)
+        pr = SSRefinementPR(
+            spec=spec.name,
+            sched1=sched1_name,
+            sched2=sched2_name,
+            result=res,
+            flip=flip,
+        )
+        self.proofs.append(pr)
+
+        self._push_update(
+            GUIPacket(
+                t=GUIPacket.T.NEW_PROOF,
+                iden=str(len(self.proofs)),
+                proofterm=str(pr),
+                result=("PASS" if res else "FAIL"),
+            )
+        )
+
+        return pr

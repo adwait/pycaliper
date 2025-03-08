@@ -365,7 +365,7 @@ class {self.objname}(Struct):
         statestring = "\n".join(states)
 
         return f"""
-class {self.objname}(Module):
+class {self.objname}(SpecModule):
 
 {initstring}
 

@@ -1,12 +1,8 @@
 {
     "jasper" : {
-        "jdir"      : "designs/adder",
+        "jdir"      : "examples/designs/adder",
         "script"    : "adder.tcl",
         "pycfile"   : "adder.pyc.sv",
         "context"   : "<embedded>::einter"
-    },
-    "spec" : {
-        "pycspec" : "adder",
-        "k"         : 3
     }
 }

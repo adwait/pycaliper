@@ -1,12 +1,8 @@
 {
     "jasper" : {
-        "jdir"      : "designs/regblock",
+        "jdir"      : "examples/designs/regblock",
         "script"    : "regblock.tcl",
         "pycfile"   : "regblock.pyc.sv",
         "context"   : "<embedded>::miter"
-    },
-    "spec" : {
-        "pycspec" : "regblock_syn",
-        "k"         : 2
     }
 }
