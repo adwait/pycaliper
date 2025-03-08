@@ -18,11 +18,13 @@ from pycaliper.svagen import SVAGen
 from pycaliper.btorinterface.pycbtorsymex import DesignConfig
 from pycaliper.verif.btorverifier import BTORVerifier2Trace
 from pycaliper.verif.jgverifier import JGVerifier1TraceBMC, JGVerifier1Trace
+from pycaliper.verif.refinementverifier import RefinementVerifier
 
 from specs.regblock import regblock
 from specs.array_nonzerobase import array_nonzerobase, array_nonzerobase2
 from specs.counter import counter
 from specs.adder import adder
+from specs.refiner_modules import refiner_module1, refiner_module2
 
 h1 = logging.StreamHandler(sys.stdout)
 h1.setLevel(logging.INFO)
@@ -68,7 +70,7 @@ class TestVerifier(unittest.TestCase):
             params="",
             sdir="",
             onetrace=True,
-            bmc=True,
+            bmc="",
         )
         return start(PYCTask.VERIFBMC, args)
 
@@ -139,20 +141,20 @@ class BTORInterfaceTest(unittest.TestCase):
 
 
 class SymbolicSimulator(unittest.TestCase):
-    def gen_test(self, specpath, jgcpath):
+    def gen_test(self, specpath, jgcpath, bmc):
         args = PYCArgs(
             specpath=specpath,
             jgcpath=jgcpath,
             params="",
             sdir="",
             onetrace=True,
-            bmc=True,
+            bmc=bmc,
         )
         return start(PYCTask.VERIFBMC, args)
 
     def test_adder(self):
         (pyconfig, tmgr, module) = self.gen_test(
-            "specs/adder", "designs/adder/config.json"
+            "specs/adder.adder", "designs/adder/config.json", "simstep"
         )
         verifier = JGVerifier1TraceBMC()
         logger.debug("Running BMC verification.")
@@ -176,6 +178,23 @@ class ReprTest(unittest.TestCase):
             addermodstr,
             "Assume statement not present in repr",
         )
+
+
+class RefinementVerifierTest(unittest.TestCase):
+    def test_bsr(self):
+        rm = refiner_module1()
+        rm.instantiate()
+        rv = RefinementVerifier()
+        res = rv.check_ss_refinement(rm, rm.simsched1, rm.simsched2)
+        self.assertTrue(res)
+
+    def test_bsr2(self):
+        # This refinement requires you to flip assertions on the first module
+        rm = refiner_module2()
+        rm.instantiate()
+        rv = RefinementVerifier()
+        res = rv.check_ss_refinement(rm, rm.simsched1, rm.simsched2, True)
+        self.assertTrue(res)
 
 
 if __name__ == "__main__":
