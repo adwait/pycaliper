@@ -769,6 +769,10 @@ class SimulationSchedule:
             fnstrs.append(indent(repr(step), "\t"))
         return "\n".join(fnstrs)
 
+    @property
+    def steps(self):
+        return self._pycinternal__steps
+
 
 def kinduct(b: int):
     """Decorator to set the k-induction depth for a state invariant specification."""

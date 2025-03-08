@@ -29,6 +29,7 @@ class GUIPacket:
     sname: str = ""
     file: str = ""
     params: str = ""
+    proofterm: str = ""
     result: str = ""
 
 
@@ -110,7 +111,7 @@ class RichGUI(PYCGUI):
         elif data.t == GUIPacket.T.NEW_SPEC:
             self.spec_table.add_row(data.sname, data.file, data.params)
         elif data.t == GUIPacket.T.NEW_PROOF:
-            self.proofs_table.add_row(data.iden, data.sname, data.dname, data.result)
+            self.proofs_table.add_row(data.iden, data.proofterm, data.result)
 
     def update_progress(self, desc: str, progress: int):
         self.layout["tasks"]["name"].update(Text(f"Ongoing task: {desc}", style="cyan"))
@@ -142,8 +143,7 @@ class RichGUI(PYCGUI):
 
         proofs_table = Table(title="Proofs", expand=True)
         proofs_table.add_column("ID", style="cyan")
-        proofs_table.add_column("Design", style="cyan")
-        proofs_table.add_column("Spec", style="cyan")
+        proofs_table.add_column("Proof Term", style="cyan")
         proofs_table.add_column("Result", style="cyan")
         layout["proofs"].update(proofs_table)
 

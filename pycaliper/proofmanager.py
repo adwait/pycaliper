@@ -1,3 +1,5 @@
+from typing import Callable
+
 from pycaliper.pycgui import GUIPacket, WebGUI, RichGUI
 
 import btoropt
@@ -5,7 +7,7 @@ from pycaliper.per import SpecModule
 
 from pycaliper.pycconfig import DesignConfig
 from pycaliper.verif.btorverifier import BTORVerifier1Trace, BTORDesign, Design
-from pycaliper.verif.mmrverifier import MMRVerifier, RefinementMap
+from pycaliper.verif.refinementverifier import RefinementMap, RefinementVerifier
 
 from btor2ex.btor2ex.utils import parsewrapper
 
@@ -27,6 +29,9 @@ class OneTracePR(ProofResult):
     design: str
     dc: DesignConfig
 
+    def __str__(self) -> str:
+        return "OneTrace(%s, %s, %s)" % (self.spec, self.design, self.dc)
+
 
 @dataclass
 class TwoTracePR(ProofResult):
@@ -34,12 +39,34 @@ class TwoTracePR(ProofResult):
     design: str
     dc: DesignConfig
 
+    def __str__(self) -> str:
+        return "TwoTrace(%s, %s, %s)" % (self.spec, self.design, self.dc)
+
 
 @dataclass
-class RefinementPR(ProofResult):
+class MMRefinementPR(ProofResult):
     spec1: str
     spec2: str
     rmap: RefinementMap
+
+    def __str__(self) -> str:
+        return "MMRefinement(%s, %s, %s)" % (self.spec1, self.spec2, self.rmap)
+
+
+@dataclass
+class SSRefinementPR(ProofResult):
+    spec: str
+    sched1: str
+    sched2: str
+    flip: bool
+
+    def __str__(self) -> str:
+        return "SSRefinement(%s, %s, %s, %s)" % (
+            self.spec,
+            self.sched1,
+            self.sched2,
+            self.flip,
+        )
 
 
 def mk_btordesign(name: str, filename: str):
@@ -125,7 +152,7 @@ class ProofManager:
         self.proofs.append(pr)
         return pr
 
-    def check_refinement(
+    def check_mm_refinement(
         self, spec1: SpecModule | str, spec2: SpecModule | str, rmap: RefinementMap
     ):
         if isinstance(spec1, str):
@@ -137,16 +164,62 @@ class ProofManager:
                 raise ValueError(f"Spec {spec2} not found.")
             spec2 = self.specs[spec2]
 
-        res = MMRVerifier().check_refinement(spec1, spec2, rmap)
+        res = RefinementVerifier().check_mm_refinement(spec1, spec2, rmap)
+        pr = MMRefinementPR(spec1=spec1.name, spec2=spec2.name, rmap=rmap, result=res)
+        self.proofs.append(pr)
+
         self._push_update(
             GUIPacket(
                 t=GUIPacket.T.NEW_PROOF,
                 iden=str(len(self.proofs)),
-                sname=spec1.name,
-                dname=spec2.name,
+                proofterm=str(pr),
                 result=("PASS" if res else "FAIL"),
             )
         )
-        pr = RefinementPR(spec1=spec1.name, spec2=spec2.name, rmap=rmap, result=res)
+
+        return pr
+
+    def check_ss_refinement(
+        self,
+        spec: SpecModule | str,
+        sched1: Callable | str,
+        sched2: Callable | str,
+        flip: bool = False,
+    ) -> ProofResult:
+        """
+        Check if bounded schedule sched1 refines sched2. If flip is True, then the assertions are flipped in sched1.
+
+        Args:
+            spec (SpecModule | str): The spec to use.
+            sched1 (Callable | str): The first schedule to check.
+            sched2 (Callable | str): The second schedule to check.
+            flip (bool, optional): Flip the assertions in sched1. Defaults to False.
+        """
+        if isinstance(spec, str):
+            if spec not in self.specs:
+                raise ValueError(f"Spec {spec} not found.")
+            spec = self.specs[spec]
+
+        sched1_name = sched1.__name__ if callable(sched1) else sched1
+        sched2_name = sched2.__name__ if callable(sched2) else sched2
+
+        res = RefinementVerifier().check_ss_refinement(spec, sched1, sched2, flip)
+        pr = SSRefinementPR(
+            spec=spec.name,
+            sched1=sched1_name,
+            sched2=sched2_name,
+            result=res,
+            flip=flip,
+        )
         self.proofs.append(pr)
+
+        self._push_update(
+            GUIPacket(
+                t=GUIPacket.T.NEW_PROOF,
+                iden=str(len(self.proofs)),
+                proofterm=str(pr),
+                result=("PASS" if res else "FAIL"),
+            )
+        )
+
         return pr

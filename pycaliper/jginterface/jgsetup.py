@@ -141,6 +141,18 @@ endmodule
 
 def setup_jasper(dc: DesignConfig, jgc: JasperConfig):
 
+    if dc.topmod == "":
+        logger.warning("Top module name is not set, skipping Jasper setup.")
+        return False
+    elif dc.cpy1 == "":
+        logger.warning("First instance name is not set, skipping Jasper setup.")
+        return False
+    elif dc.cpy1 == dc.cpy2:
+        logger.warning(
+            "First and second instance names are the same, skipping Jasper setup."
+        )
+        return False
+
     jgdir = pathlib.Path(jgc.jdir)
 
     # Design file is relative to the Jasper working directory
@@ -167,15 +179,6 @@ def setup_jasper(dc: DesignConfig, jgc: JasperConfig):
                 design_lst_file=lstfile.as_posix(), harnessmod=harnessmod, lang=dc.lang
             )
         )
-
-    if dc.topmod == "":
-        raise ValueError("Top module name is not set.")
-
-    if dc.cpy1 == "":
-        raise ValueError("First instance name is not set.")
-
-    if dc.cpy1 == dc.cpy2:
-        raise ValueError("First and second instance names are the same.")
 
     # Write the harness module to a file (if already exists, overwrite)
     harnessfile = (jgdir / f"{harnessmod}.sv").resolve()
