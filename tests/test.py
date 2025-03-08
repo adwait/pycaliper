@@ -7,7 +7,7 @@ import unittest
 from tempfile import NamedTemporaryFile
 
 from pycaliper.pycmanager import PYCArgs, PYCTask, start
-from pycaliper.proofmanager import mk_btordesign
+from pycaliper.proofmanager import mk_btordesign, ProofManager
 
 from pycaliper.frontend.pyclex import lexer
 from pycaliper.frontend.pycparse import parser
@@ -20,11 +20,12 @@ from pycaliper.verif.btorverifier import BTORVerifier2Trace
 from pycaliper.verif.jgverifier import JGVerifier1TraceBMC, JGVerifier1Trace
 from pycaliper.verif.refinementverifier import RefinementVerifier
 
-from specs.regblock import regblock
-from specs.array_nonzerobase import array_nonzerobase, array_nonzerobase2
-from specs.counter import counter
-from specs.adder import adder
-from specs.refiner_modules import refiner_module1, refiner_module2
+from tests.specs.regblock import regblock
+from tests.specs.array_nonzerobase import array_nonzerobase, array_nonzerobase2
+from tests.specs.counter import counter
+from tests.specs.adder import adder
+from tests.specs.refiner_modules import refiner_module1, refiner_module2
+from tests.specs.demo import demo
 
 h1 = logging.StreamHandler(sys.stdout)
 h1.setLevel(logging.INFO)
@@ -76,7 +77,7 @@ class TestVerifier(unittest.TestCase):
 
     def test_regblock(self):
         (pyconfig, tmgr, regb) = self.gen_test(
-            "specs/regblock", "designs/regblock/config.json"
+            "tests/specs/regblock", "examples/designs/regblock/config.json"
         )
         invverif = JGVerifier2Trace()
         regb.instantiate()
@@ -85,7 +86,7 @@ class TestVerifier(unittest.TestCase):
 
     def test_counter(self):
         (pyconfig, tmgr, counter) = self.gen_test(
-            "specs/counter", "designs/counter/config.json"
+            "tests/specs/counter", "examples/designs/counter/config.json"
         )
         invverif = JGVerifier1Trace()
         counter.instantiate()
@@ -95,7 +96,7 @@ class TestVerifier(unittest.TestCase):
 
 class TestParser(unittest.TestCase):
     def load_test(self, testname):
-        filename = os.path.join("tests/specs", testname)
+        filename = os.path.join("tests/specs.caliper", testname)
         with open(filename, "r") as f:
             return f.read()
 
@@ -154,7 +155,7 @@ class SymbolicSimulator(unittest.TestCase):
 
     def test_adder(self):
         (pyconfig, tmgr, module) = self.gen_test(
-            "specs/adder.adder", "designs/adder/config.json", "simstep"
+            "tests/specs/adder.adder", "examples/designs/adder/config.json", "simstep"
         )
         verifier = JGVerifier1TraceBMC()
         logger.debug("Running BMC verification.")
@@ -195,6 +196,18 @@ class RefinementVerifierTest(unittest.TestCase):
         rv = RefinementVerifier()
         res = rv.check_ss_refinement(rm, rm.simsched1, rm.simsched2, True)
         self.assertTrue(res)
+
+
+class ProofmanagerTest(unittest.TestCase):
+    def test_demo_btor(self):
+
+        pm = ProofManager()
+        prgm = pm.mk_btor_design_from_file(
+            "examples/designs/demo/btor/full_design.btor", "demo"
+        )
+        spec = pm.mk_spec(demo, "demo_spec")
+        pr = pm.mk_btor_proof_one_trace(spec, prgm)
+        self.assertTrue(pr.result)
 
 
 if __name__ == "__main__":

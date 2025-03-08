@@ -1,6 +1,6 @@
 {
     "jasper" : {
-        "jdir"      : "designs/demo",
+        "jdir"      : "examples/designs/demo",
         "script"    : "demo.tcl",
         "pycfile"   : "demo.pyc.sv",
         "context"   : "<embedded>::miter"
