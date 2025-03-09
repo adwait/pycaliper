@@ -1,11 +1,18 @@
 from typing import Callable
 
+from pycaliper.pycmanager import mock_or_connect
 from pycaliper.pycgui import GUIPacket, WebGUI, RichGUI
 
 import btoropt
 from pycaliper.per import SpecModule
 
-from pycaliper.pycconfig import DesignConfig
+from pycaliper.pycconfig import DesignConfig, PYConfig
+from pycaliper.verif.jgverifier import (
+    JGVerifier1Trace,
+    JGVerifier2Trace,
+    JGVerifier1TraceBMC,
+    JGDesign,
+)
 from pycaliper.verif.btorverifier import BTORVerifier1Trace, BTORDesign, Design
 from pycaliper.verif.refinementverifier import RefinementMap, RefinementVerifier
 
@@ -24,23 +31,33 @@ class ProofResult:
 
 
 @dataclass
-class OneTracePR(ProofResult):
+class OneTraceBndPR(ProofResult):
     spec: str
+    sched: str
     design: str
-    dc: DesignConfig
 
     def __str__(self) -> str:
-        return "OneTrace(%s, %s, %s)" % (self.spec, self.design, self.dc)
+        return "OneTraceBnd(%s, %s, %s)" % (self.spec, self.sched, self.design)
 
 
 @dataclass
-class TwoTracePR(ProofResult):
+class OneTraceIndPR(ProofResult):
     spec: str
     design: str
     dc: DesignConfig
 
     def __str__(self) -> str:
-        return "TwoTrace(%s, %s, %s)" % (self.spec, self.design, self.dc)
+        return "OneTraceInd(%s, %s, %s)" % (self.spec, self.design, self.dc)
+
+
+@dataclass
+class TwoTraceIndPR(ProofResult):
+    spec: str
+    design: str
+    dc: DesignConfig
+
+    def __str__(self) -> str:
+        return "TwoTraceInd(%s, %s, %s)" % (self.spec, self.design, self.dc)
 
 
 @dataclass
@@ -79,6 +96,7 @@ class ProofManager:
         self.proofs: list[ProofResult] = []
         self.designs: dict[str, Design] = {}
         self.specs: dict[str, SpecModule] = {}
+        self.pyconfigs: dict[str, PYConfig] = {}
         if webgui:
             self.gui = WebGUI()
             self.gui.run()
@@ -122,6 +140,19 @@ class ProofManager:
         )
         return des
 
+    def mk_jg_design_from_pyc(self, name: str, pyc: PYConfig) -> Design:
+        if name in self.designs:
+            logger.warning(f"Design {name} already exists.")
+        des = JGDesign(name, pyc)
+        self.designs[name] = des
+
+        self._push_update(
+            GUIPacket(
+                t=GUIPacket.T.NEW_DESIGN, dname=name, file=pyc.jgc.pycfile, params=None
+            )
+        )
+        return des
+
     def mk_btor_proof_one_trace(
         self,
         spec: SpecModule | str,
@@ -148,7 +179,47 @@ class ProofManager:
                 result=("PASS" if res else "FAIL"),
             )
         )
-        pr = OneTracePR(spec=spec.name, design=design.name, dc=dc, result=res)
+        pr = OneTraceIndPR(spec=spec.name, design=design.name, dc=dc, result=res)
+        self.proofs.append(pr)
+        return pr
+
+    def mk_jg_proof_bounded_spec(
+        self, spec: SpecModule | str, design: Design | str, sched: Callable | str
+    ) -> ProofResult:
+        if isinstance(spec, str):
+            if spec not in self.specs:
+                raise ValueError(f"Spec {spec} not found.")
+            spec = self.specs[spec]
+        if isinstance(design, str):
+            if design not in self.designs:
+                raise ValueError(f"Design {design} not found.")
+            design = self.designs[design]
+
+        sched_name = sched.__name__ if callable(sched) else sched
+
+        assert isinstance(
+            design, JGDesign
+        ), "Design must be a JGDesign for Jasper verification."
+
+        mock_or_connect(design.pyc)
+        verifier = JGVerifier1TraceBMC()
+
+        res = verifier.verify(spec, design.pyc, sched_name)
+        result_str = ",".join(
+            [f"step<{i}>:{'PASS' if r else 'FAIL'}" for i, r in enumerate(res)]
+        )
+        pr = OneTraceBndPR(
+            spec=spec.name, sched=sched_name, design=design.name, result=res
+        )
+
+        self._push_update(
+            GUIPacket(
+                t=GUIPacket.T.NEW_PROOF,
+                iden=str(len(self.proofs)),
+                proofterm=str(pr),
+                result=result_str,
+            )
+        )
         self.proofs.append(pr)
         return pr
 

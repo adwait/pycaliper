@@ -176,7 +176,7 @@ def setup_jasper(dc: DesignConfig, jgc: JasperConfig):
     with open(tclfile, "w") as f:
         f.write(
             _create_tcl_script(
-                design_lst_file=lstfile.as_posix(), harnessmod=harnessmod, lang=dc.lang
+                design_lst_file=jgc.design_list, harnessmod=harnessmod, lang=dc.lang
             )
         )
 

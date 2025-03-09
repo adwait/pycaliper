@@ -15,8 +15,21 @@ from ..jginterface.jgoracle import (
 )
 
 from pycaliper.per import SpecModule
+from pycaliper.verif.btorverifier import Design
+import hashlib
+import dill as pickle
 
 logger = logging.getLogger(__name__)
+
+
+class JGDesign(Design):
+    def __init__(self, name: str, pyc: PYConfig) -> None:
+        assert not pyc.mock, f"JasperDesign {name} cannot operate in mock mode!"
+        self.name = name
+        self.pyc = pyc
+
+    def __hash__(self):
+        return hashlib.md5(pickle.dumps(self.pyc)).hexdigest()
 
 
 class JGVerifier1Trace:
