@@ -1,7 +1,10 @@
 import pathlib
 import logging
 
+from pycaliper.per import SpecModule
+
 from ..pycconfig import DesignConfig, JasperConfig
+from ..jginterface.jgoracle import setjwd
 
 logger = logging.getLogger(__name__)
 
@@ -83,15 +86,17 @@ set_max_trace_length {max_trace_len}
 """
 
 
-def _create_design_instance(dc: DesignConfig, inst_name: str) -> str:
+def _create_design_instance(mod: SpecModule, dc: DesignConfig, inst_name: str) -> str:
     return f"""
 {dc.topmod} {inst_name} (
-    .{dc.clk}({HARNESS_CLK})
+    .{mod.get_clk().name}({HARNESS_CLK})
 );
 """
 
 
-def _create_proof_harness_miter(pycfile: str, harnessmod: str, dc: DesignConfig) -> str:
+def _create_proof_harness_miter(
+    mod: SpecModule, pycfile: str, harnessmod: str, dc: DesignConfig
+) -> str:
     return f"""
 // Parent module with a miter with different inputs
 module {harnessmod} (
@@ -99,9 +104,9 @@ module {harnessmod} (
     , input wire {HARNESS_RST}
 );
 
-    {_create_design_instance(dc, dc.cpy1)}
+    {_create_design_instance(mod, dc, dc.cpy1)}
 
-    {_create_design_instance(dc, dc.cpy2)}
+    {_create_design_instance(mod, dc, dc.cpy2)}
 
 
     default clocking cb @(posedge {HARNESS_CLK});
@@ -116,7 +121,7 @@ endmodule
 
 
 def _create_proof_harness_single(
-    pycfile: str, harnessmod: str, dc: DesignConfig
+    mod: SpecModule, pycfile: str, harnessmod: str, dc: DesignConfig
 ) -> str:
     return f"""
 // Parent module with a single design
@@ -125,7 +130,7 @@ module {harnessmod} (
     , input wire {HARNESS_RST}
 );
 
-    {_create_design_instance(dc, dc.cpy1)}
+    {_create_design_instance(mod, dc, dc.cpy1)}
 
 
     default clocking cb @(posedge {HARNESS_CLK});
@@ -139,7 +144,7 @@ endmodule
 """
 
 
-def setup_jasper(dc: DesignConfig, jgc: JasperConfig):
+def setup_jasper(mod: SpecModule, jgc: JasperConfig, dc: DesignConfig) -> bool:
 
     if dc.topmod == "":
         logger.warning("Top module name is not set, skipping Jasper setup.")
@@ -176,7 +181,10 @@ def setup_jasper(dc: DesignConfig, jgc: JasperConfig):
     with open(tclfile, "w") as f:
         f.write(
             _create_tcl_script(
-                design_lst_file=jgc.design_list, harnessmod=harnessmod, lang=dc.lang
+                design_lst_file=jgc.design_list,
+                harnessmod=harnessmod,
+                lang=dc.lang,
+                max_trace_len=mod.get_unroll_kind_depths()[1],
             )
         )
 
@@ -184,10 +192,11 @@ def setup_jasper(dc: DesignConfig, jgc: JasperConfig):
     harnessfile = (jgdir / f"{harnessmod}.sv").resolve()
     # Create the harness module
     if dc.cpy2 != "":
-        harness = _create_proof_harness_miter(jgc.pycfile, harnessmod, dc)
+        harness = _create_proof_harness_miter(mod, jgc.pycfile, harnessmod, dc)
     else:
-        harness = _create_proof_harness_single(jgc.pycfile, harnessmod, dc)
+        harness = _create_proof_harness_single(mod, jgc.pycfile, harnessmod, dc)
     with open(harnessfile, "w") as f:
         f.write(harness)
+    setjwd(jgc.jdir)
 
     return True

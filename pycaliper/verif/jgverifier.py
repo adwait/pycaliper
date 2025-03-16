@@ -3,6 +3,7 @@ import logging
 from ..pycconfig import PYConfig
 
 from .. import svagen
+from ..jginterface.jgsetup import setup_jasper
 from ..jginterface.jgoracle import (
     prove_out_induction_1t,
     prove_out_induction_2t,
@@ -48,6 +49,7 @@ class JGVerifier1Trace:
             bool: True if the module is safe, False otherwise
         """
 
+        setup_jasper(specmodule, pyconfig.jgc, pyconfig.dc)
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
             specmodule,
@@ -82,6 +84,7 @@ class JGVerifier2Trace:
         Returns:
             bool: True if the module is safe, False otherwise
         """
+        setup_jasper(specmodule, pyconfig.jgc, pyconfig.dc)
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
             specmodule, filename=pyconfig.jgc.pycfile_abspath(), dc=pyconfig.dc
@@ -114,6 +117,7 @@ class JGVerifier1TraceBMC:
             bool: True if the module is safe, False otherwise
         """
 
+        setup_jasper(specmodule, pyconfig.jgc, pyconfig.dc)
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
             specmodule, filename=pyconfig.jgc.pycfile_abspath(), dc=pyconfig.dc

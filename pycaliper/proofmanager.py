@@ -209,7 +209,7 @@ class ProofManager:
             [f"step<{i}>:{'PASS' if r else 'FAIL'}" for i, r in enumerate(res)]
         )
         pr = OneTraceBndPR(
-            spec=spec.name, sched=sched_name, design=design.name, result=res
+            spec=spec.name, sched=sched_name, design=design.name, result=all(res)
         )
 
         self._push_update(
@@ -217,7 +217,7 @@ class ProofManager:
                 t=GUIPacket.T.NEW_PROOF,
                 iden=str(len(self.proofs)),
                 proofterm=str(pr),
-                result=result_str,
+                result=("PASS" if all(res) else "FAIL"),
             )
         )
         self.proofs.append(pr)
