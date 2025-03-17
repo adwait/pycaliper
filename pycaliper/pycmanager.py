@@ -12,8 +12,6 @@ from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 
 from pycaliper.jginterface import jasperclient as jgc
-from pycaliper.jginterface.jgoracle import setjwd
-from pycaliper.jginterface.jgsetup import setup_jasper
 
 from pydantic import BaseModel
 from .pycconfig import PYConfig, DesignConfig, JasperConfig
@@ -220,7 +218,6 @@ def mock_or_connect(pyconfig: PYConfig) -> bool:
         return False
     else:
         jgc.connect_tcp("localhost", pyconfig.jgc.port)
-        setjwd(pyconfig.jgc.jdir)
         return True
 
 
@@ -290,7 +287,6 @@ def get_pyconfig(args: PYCArgs) -> PYConfig:
 def setup_all(args: PYCArgs) -> tuple[bool, PYConfig, PYCManager]:
     pyconfig = get_pyconfig(args)
     tmgr = PYCManager(pyconfig)
-    setup_jasper(pyconfig.dc, pyconfig.jgc)
     is_connected = mock_or_connect(pyconfig)
 
     return is_connected, pyconfig, tmgr

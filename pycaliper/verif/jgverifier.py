@@ -3,6 +3,7 @@ import logging
 from ..pycconfig import PYConfig
 
 from .. import svagen
+from ..jginterface.jgsetup import setup_jasper
 from ..jginterface.jgoracle import (
     prove_out_induction_1t,
     prove_out_induction_2t,
@@ -15,8 +16,21 @@ from ..jginterface.jgoracle import (
 )
 
 from pycaliper.per import SpecModule
+from pycaliper.verif.btorverifier import Design
+import hashlib
+import dill as pickle
 
 logger = logging.getLogger(__name__)
+
+
+class JGDesign(Design):
+    def __init__(self, name: str, pyc: PYConfig) -> None:
+        assert not pyc.mock, f"JasperDesign {name} cannot operate in mock mode!"
+        self.name = name
+        self.pyc = pyc
+
+    def __hash__(self):
+        return hashlib.md5(pickle.dumps(self.pyc)).hexdigest()
 
 
 class JGVerifier1Trace:
@@ -35,6 +49,7 @@ class JGVerifier1Trace:
             bool: True if the module is safe, False otherwise
         """
 
+        setup_jasper(specmodule, pyconfig.jgc, pyconfig.dc)
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
             specmodule,
@@ -69,6 +84,7 @@ class JGVerifier2Trace:
         Returns:
             bool: True if the module is safe, False otherwise
         """
+        setup_jasper(specmodule, pyconfig.jgc, pyconfig.dc)
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
             specmodule, filename=pyconfig.jgc.pycfile_abspath(), dc=pyconfig.dc
@@ -101,6 +117,7 @@ class JGVerifier1TraceBMC:
             bool: True if the module is safe, False otherwise
         """
 
+        setup_jasper(specmodule, pyconfig.jgc, pyconfig.dc)
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
             specmodule, filename=pyconfig.jgc.pycfile_abspath(), dc=pyconfig.dc

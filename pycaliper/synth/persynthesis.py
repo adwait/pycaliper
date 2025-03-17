@@ -10,6 +10,7 @@ from ..per import SpecModule, PERHole, Context
 from .iis_strategy import *
 
 from pycaliper.svagen import SVAGen
+from pycaliper.jginterface.jgsetup import setup_jasper
 from pycaliper.jginterface.jgoracle import (
     prove,
     prove_out_induction_2t,
@@ -199,6 +200,7 @@ class PERSynthesizer:
         # Create a new SVA generator
         assert topmod.is_instantiated(), "Module not instantiated."
 
+        setup_jasper(topmod, self.pyconfig.jgc, self.pyconfig.dc)
         self.svagen = SVAGen()
         self.svagen.create_pyc_specfile(
             topmod, filename=self.pyconfig.jgc.pycfile_abspath(), dc=self.pyconfig.dc
