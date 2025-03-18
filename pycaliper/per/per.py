@@ -30,6 +30,7 @@ from functools import wraps
 from textwrap import indent
 
 from pycaliper.per.expr import Expr, Const
+from ..propns import *
 
 logger = logging.getLogger(__name__)
 
@@ -374,6 +375,9 @@ class PER(Prop):
     def get_sva(self, cpy1: str, cpy2: str):
         raise NotImplementedError("Method not implemented for abstract base PER class.")
 
+    def _get_id_for_per_hole(self):
+        raise NotImplementedError("Method not implemented for abstract base PER class.")
+
 
 class Eq(PER):
     """Relational equality assertion."""
@@ -407,6 +411,9 @@ class Eq(PER):
     def __repr__(self):
         return f"self.eq({repr(self.logic)})"
 
+    def _get_id_for_per_hole(self):
+        return eq_sva(f"hole_{self.logic.get_hier_path('_')}")
+
 
 class CondEq(PER):
     """Conditional equality assertion"""
@@ -428,6 +435,9 @@ class CondEq(PER):
 
     def __repr__(self):
         return f"self.when({repr(self.cond)})({repr(self.logic)})"
+
+    def _get_id_for_per_hole(self):
+        return condeq_sva(f"hole_{str(self.cond)}_{self.logic.get_hier_path('_')}")
 
 
 class Inv(Prop):

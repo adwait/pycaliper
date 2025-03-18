@@ -25,14 +25,6 @@ def step_signal(k: int):
 # def step_property(k: int):
 #     return f"step_{k}"
 
-# Internal wire names
-def eq_sva(s: str):
-    return f"eq_{s}"
-
-
-def condeq_sva(s: str):
-    return f"condeq_{s}"
-
 
 def per_sva(mod: SpecModule, spec_ctx: Context):
     if spec_ctx == Context.INPUT:
@@ -112,19 +104,13 @@ class SVAGen:
             declname = condeq_sva(declbase)
         return (wirename, declname, declsize)
 
-    def _get_id_for_per_hole(self, per: PER):
-        if isinstance(per, Eq):
-            return eq_sva(f"hole_{per.logic.get_hier_path('_')}")
-        elif isinstance(per, CondEq):
-            return condeq_sva(f"hole_{str(per.cond)}_{per.logic.get_hier_path('_')}")
-
     def _generate_decls_for_per_hole(self, per: PER):
         if per.logic.is_arr_elem():
             logger.error(
                 f"Array elements not supported in holes: {per.logic.get_hier_path()}"
             )
             sys.exit(1)
-        wirename = self._get_id_for_per_hole(per)
+        wirename = per._get_id_for_per_hole()
         declsize = ""
         return (wirename, wirename, declsize)
 
@@ -287,33 +273,29 @@ class SVAGen:
             if hole.active:
                 if isinstance(hole.per, Eq):
                     assm_prop = (
-                        f"A_{self._get_id_for_per_hole(hole.per)} : assume property\n"
-                        + f"\t(!({STEP_SIGNAL}) |-> {self._get_id_for_per_hole(hole.per)});"
+                        f"A_{hole.per._get_id_for_per_hole()} : assume property\n"
+                        + f"\t(!({STEP_SIGNAL}) |-> {hole.per._get_id_for_per_hole()});"
                     )
                     asrt_prop = (
-                        f"P_{self._get_id_for_per_hole(hole.per)} : assert property\n"
-                        + f"\t(({STEP_SIGNAL}) |-> {self._get_id_for_per_hole(hole.per)});"
+                        f"P_{hole.per._get_id_for_per_hole()} : assert property\n"
+                        + f"\t(({STEP_SIGNAL}) |-> {hole.per._get_id_for_per_hole()});"
                     )
-                    self.holes[self._get_id_for_per_hole(hole.per)] = hole.per.logic
+                    self.holes[hole.per._get_id_for_per_hole()] = hole.per.logic
                     properties.extend([assm_prop, asrt_prop])
-                    self.property_context.holes.append(
-                        self._get_id_for_per_hole(hole.per)
-                    )
+                    self.property_context.holes.append(hole.per._get_id_for_per_hole())
 
                 elif isinstance(hole.per, CondEq):
                     assm_prop = (
-                        f"A_{self._get_id_for_per_hole(hole.per)} : assume property\n"
-                        + f"\t(!({STEP_SIGNAL}) |-> {self._get_id_for_per_hole(hole.per)});"
+                        f"A_{hole.per._get_id_for_per_hole()} : assume property\n"
+                        + f"\t(!({STEP_SIGNAL}) |-> {hole.per._get_id_for_per_hole()});"
                     )
                     asrt_prop = (
-                        f"P_{self._get_id_for_per_hole(hole.per)} : assert property\n"
-                        + f"\t(({STEP_SIGNAL}) |-> {self._get_id_for_per_hole(hole.per)});"
+                        f"P_{hole.per._get_id_for_per_hole()} : assert property\n"
+                        + f"\t(({STEP_SIGNAL}) |-> {hole.per._get_id_for_per_hole()});"
                     )
-                    self.holes[self._get_id_for_per_hole(hole.per)] = hole.per.logic
+                    self.holes[hole.per._get_id_for_per_hole()] = hole.per.logic
                     properties.extend([assm_prop, asrt_prop])
-                    self.property_context.holes.append(
-                        self._get_id_for_per_hole(hole.per)
-                    )
+                    self.property_context.holes.append(hole.per._get_id_for_per_hole())
 
         return properties, self._generate_decls_inner(self.topmod)
 

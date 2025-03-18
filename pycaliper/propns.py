@@ -27,3 +27,11 @@ def get_as_assm(prop: str) -> str:
 def get_as_prop(prop: str) -> str:
     """Get the assertion name for a given property"""
     return f"P_{prop}"
+
+
+def eq_sva(s: str):
+    return f"eq_{s}"
+
+
+def condeq_sva(s: str):
+    return f"condeq_{s}"
