@@ -74,8 +74,8 @@ class Expr:
     def eor(self, other):
         return OpApply(BinaryOr(), [self, other])
 
-    def eneg(self, other):
-        return OpApply(UnaryBitwiseNot(), [self, other])
+    def eneg(self):
+        return OpApply(UnaryBitwiseNot(), [self])
 
     def get_sva(self, pref: str = "a") -> str:
         # Convert into SystemVerilog assertion
@@ -372,7 +372,7 @@ class OpApply(Expr):
                 f"({self.args[0].get_sva(pref)} {self.op} {self.args[1].get_sva(pref)})"
             )
         elif self.op.fixity == Op.Fixity.PREFIX:
-            return f"{self.op} {self.args[0].get_sva(pref)}"
+            return f"({self.op} {self.args[0].get_sva(pref)})"
         else:
             raise ValueError(f"Unknown fixity for operator {self.op}.")
 

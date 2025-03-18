@@ -30,6 +30,7 @@ from functools import wraps
 from textwrap import indent
 
 from pycaliper.per.expr import Expr, Const
+from ..propns import *
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +233,8 @@ class Logic(Expr, TypedElem):
             str: SVA representation of the signal.
         """
         if self.root is not None:
+            if self.root == "":
+                return f"{self.get_hier_path()}"
             return f"{self.root}.{self.get_hier_path()}"
         return f"{pref}.{self.get_hier_path()}"
 
@@ -374,6 +377,9 @@ class PER(Prop):
     def get_sva(self, cpy1: str, cpy2: str):
         raise NotImplementedError("Method not implemented for abstract base PER class.")
 
+    def _get_id_for_per_hole(self):
+        raise NotImplementedError("Method not implemented for abstract base PER class.")
+
 
 class Eq(PER):
     """Relational equality assertion."""
@@ -407,6 +413,9 @@ class Eq(PER):
     def __repr__(self):
         return f"self.eq({repr(self.logic)})"
 
+    def _get_id_for_per_hole(self):
+        return eq_sva(f"hole_{self.logic.get_hier_path('_')}")
+
 
 class CondEq(PER):
     """Conditional equality assertion"""
@@ -428,6 +437,9 @@ class CondEq(PER):
 
     def __repr__(self):
         return f"self.when({repr(self.cond)})({repr(self.logic)})"
+
+    def _get_id_for_per_hole(self):
+        return condeq_sva(f"hole_{str(self.cond)}_{self.logic.get_hier_path('_')}")
 
 
 class Inv(Prop):
@@ -459,7 +471,9 @@ class Struct(TypedElem):
 
     def get_sva(self, pref: str = "a") -> str:
         if self.root is not None:
-            return f"{self.root}.{self.name}"
+            if self.root == "":
+                return f"{self.path.get_hier_path()}"
+            return f"{self.root}.{self.path.get_hier_path()}"
         return f"{pref}.{self.name}"
 
     def __str__(self) -> str:
@@ -856,7 +870,7 @@ class SpecModule:
         self._pycinternal__fsmholes: list[FSMHole] = []
 
         self._pycinternal__auxmodules: dict[str, AuxModule] = {}
-        # self._auxregs = dict[str, AuxReg]
+        self._pycinternal__auxregs: dict[str, AuxReg] = {}
         self._pycinternal__prev_signals = {}
         # Clock signal
         self._pycinternal__clk: (Clock | None) = None
@@ -1106,6 +1120,7 @@ class SpecModule:
         funcattrs = {}
         submoduleattrs = {}
         auxmoduleattrs = {}
+        auxregattrs = {}
         for attr in dir(self):
             obj = getattr(self, attr)
             if isinstance(obj, Clock):
@@ -1119,6 +1134,10 @@ class SpecModule:
                 if obj.name == "":
                     obj.name = attr
                 self._pycinternal__clk = obj.instantiate(path.add_level(obj.name))
+            elif isinstance(obj, AuxReg):
+                if obj.name == "":
+                    obj.name = attr
+                auxregattrs[obj.name] = obj.instantiate(path.add_level(obj.name))
             elif (
                 isinstance(obj, Logic)
                 or isinstance(obj, LogicArray)
@@ -1167,6 +1186,7 @@ class SpecModule:
         self._pycinternal__groups = groupattrs
         self._pycinternal__functions = funcattrs
         self._pycinternal__submodules = submoduleattrs
+        self._pycinternal__auxregs = auxregattrs
         self._pycinternal__auxmodules = auxmoduleattrs
         # Call the specification generator methods.
         self._pycinternal__context = Context.INPUT
@@ -1288,7 +1308,11 @@ class SpecModule:
             f"\t\tself.{nonreserved_or_fresh(self._pycinternal__clk.name)} = Clock({self._pycinternal__clk.name})"
         )
         for s, t in self._pycinternal__signals.items():
-            if isinstance(t, Logic):
+            if isinstance(t, AuxReg):
+                inits.append(
+                    f'\t\tself.{nonreserved_or_fresh(t.name)} = AuxReg({t.width}, "{t.name}")'
+                )
+            elif isinstance(t, Logic):
                 inits.append(
                     f'\t\tself.{nonreserved_or_fresh(t.name)} = Logic({t.width}, "{t.name}")'
                 )
@@ -1416,17 +1440,10 @@ class AuxModule(SpecModule):
         return aux_mod_decl
 
 
-# class AuxReg(Logic):
+class AuxReg(Logic):
+    def __init__(self, width=1, name: str = "") -> None:
+        super().__init__(width, name, root="")
 
-#     def __init__(self, width = 1, name: str = "", root: str = None) -> None:
-#         super().__init__(width, name, root)
-#         self.elaborated = False
-
-#     def instantiate(self, path: Path) -> "AuxReg":
-#         logger.warn("AuxReg is only supported for JG and will be deprecated, use AuxModule instead!")
-#         self.path = path
-#         self.elaborated = True
-#         jgoracle.create_auxreg(self.name, self.width)
 
 # SVA-specific functions
 past = SVFunc("$past")

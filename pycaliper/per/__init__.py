@@ -20,6 +20,7 @@ from .per import (
     SVFunc,
     AuxPort,
     AuxModule,
+    AuxReg,
     unroll,
     kinduct,
     rose,

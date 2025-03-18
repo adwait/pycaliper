@@ -1,6 +1,6 @@
 import logging
 
-from ..pycconfig import PYConfig
+from ..pycconfig import PYConfig, Design
 
 from .. import svagen
 from ..jginterface.jgsetup import setup_jasper
@@ -16,7 +16,6 @@ from ..jginterface.jgoracle import (
 )
 
 from pycaliper.per import SpecModule
-from pycaliper.verif.btorverifier import Design
 import hashlib
 import dill as pickle
 
