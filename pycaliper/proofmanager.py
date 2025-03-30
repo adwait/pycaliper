@@ -7,12 +7,8 @@ import btoropt
 from pycaliper.per import SpecModule
 
 from pycaliper.pycconfig import DesignConfig, PYConfig, Design
-from pycaliper.verif.jgverifier import (
-    JGVerifier1Trace,
-    JGVerifier2Trace,
-    JGVerifier1TraceBMC,
-    JGDesign,
-)
+from pycaliper.jginterface.jgdesign import JGDesign
+from pycaliper.verif.jgverifier import JGVerifier1TraceBMC
 from pycaliper.btorinterface.btordesign import BTORDesign
 from pycaliper.verif.btorverifier import BTORVerifier1Trace
 from pycaliper.verif.refinementverifier import RefinementMap, RefinementVerifier

@@ -180,7 +180,7 @@ class BTORVerifier2Trace(PYCBTORInterface):
                 "For assertion %s, result %s", assrt, "BUG" if result else "SAFE"
             )
             if result:
-                logger.debug("Found a bug")
+                logger.debug("Found a counterexample")
                 btor_model = self.symex.get_model()
                 logger.debug("Model:\n%s", btor_model)
                 vcd_content = write_vcd(btor_model.signals, btor_model.assignments)
@@ -239,7 +239,7 @@ class BTORVerifier1Trace(PYCBTORInterface):
         specmodule: SpecModule,
         des: BTORDesign,
         dc: DesignConfig,
-    ) -> bool:
+    ) -> BTORVerifResult:
         """
         Perform verification for a single module of the following property:
             input_eq && state_eq |-> ##1 output_eq && state_eq
@@ -305,12 +305,14 @@ class BTORVerifier1Trace(PYCBTORInterface):
                 "For assertion %s, result %s", assrt_expr, "BUG" if result else "SAFE"
             )
             if result:
-                logger.debug("Found a bug")
-                model = self.symex.slv.get_model()
-                logger.debug("Model:\n%s", model)
-                return False
+                logger.debug("Found a counterexample")
+                btor_model = self.symex.get_model()
+                logger.debug("Model:\n%s", btor_model)
+                vcd_content = write_vcd(btor_model.signals, btor_model.assignments)
+                res = BTORVerifResult(False, vcd_content)
+                return res
             self.symex.slv.pop()
 
         logger.debug("No bug found, inductive proof complete")
         # Safe
-        return True
+        return BTORVerifResult(True, None)

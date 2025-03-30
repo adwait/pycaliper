@@ -23,6 +23,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class BTORVerifResult:
+    """
+    Verification result of a BTOR program
+
+    Attributes:
+        verified (bool): True if verification was successful, False otherwise
+        model (str): Model of the BTOR program as a string
+    """
+
     verified: bool
     model: str
 

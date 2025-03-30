@@ -22,9 +22,9 @@ from pycaliper.jginterface.jgoracle import (
     loadscript,
 )
 from pycaliper.pycconfig import Design, DesignConfig
-from pycaliper.verif.jgverifier import JGDesign
+from pycaliper.jginterface.jgdesign import JGDesign
 from pycaliper.synth.btorsynthesizer import BTORVerifier2TraceIncremental
-from pycaliper.verif.btorverifier import BTORDesign
+from pycaliper.btorinterface.btordesign import BTORDesign
 
 
 logger = logging.getLogger(__name__)
@@ -375,7 +375,7 @@ class HoudiniSynthesizerBTOR(HoudiniSynthesizer):
 
     def _check_safe(self):
         # Check if there is a CEX
-        return self.verifier.check_safe()
+        return self.verifier.verify().verified
 
 
 class PERSynthesizer:

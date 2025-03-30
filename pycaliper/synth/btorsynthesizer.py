@@ -4,10 +4,11 @@ import logging
 from btoropt import program as prg
 from btor2ex import BoolectorSolver, BTOR2Ex
 
-from ..btorinterface.pycbtorinterface import PYCBTORInterface
+from ..btorinterface.pycbtorinterface import PYCBTORInterface, BTORVerifResult
 from ..btorinterface.btordesign import BTORDesign
 from ..pycconfig import DesignConfig
-from ..per import SpecModule, Eq, CondEq
+from ..per import SpecModule
+from ..btorinterface.vcdgenerator import write_vcd
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +226,7 @@ class BTORVerifier2TraceIncremental(PYCBTORInterface):
         self.symex.slv.pop()
         return not result
 
-    def check_safe(self) -> bool:
+    def verify(self) -> BTORVerifResult:
         """Check if the program is safe"""
         for assrt_expr, assrt in zip(self.assrt_exprs, self.out_assrts):
             for assm in self.in_assms:
@@ -248,7 +249,13 @@ class BTORVerifier2TraceIncremental(PYCBTORInterface):
                 assrt_expr,
                 "UNSAFE" if result else "SAFE",
             )
-            self.symex.slv.pop()
             if result:
-                return False
-        return True
+                logger.debug("Found a counterexample")
+                btor_model = self.symex.get_model()
+                self.symex.slv.pop()
+                logger.debug("Model:\n%s", btor_model)
+                vcd_content = write_vcd(btor_model.signals, btor_model.assignments)
+                res = BTORVerifResult(False, vcd_content)
+                return res
+        self.symex.slv.pop()
+        return BTORVerifResult(True, None)
