@@ -15,12 +15,19 @@ from pycaliper.frontend.pycgen import PYCGenPass
 
 from pycaliper.verif.jgverifier import JGVerifier2Trace
 from pycaliper.svagen import SVAGen
-from pycaliper.btorinterface.pycbtorsymex import DesignConfig
+from pycaliper.pycconfig import DesignConfig
 from pycaliper.verif.btorverifier import BTORVerifier2Trace
-from pycaliper.verif.jgverifier import JGVerifier1TraceBMC, JGVerifier1Trace
+from pycaliper.verif.jgverifier import JGVerifier1TraceBMC, JGVerifier1Trace, JGDesign
 from pycaliper.verif.refinementverifier import RefinementVerifier
+from pycaliper.synth.persynthesis import (
+    PERSynthesizer,
+    HoudiniSynthesizerJG,
+    HoudiniSynthesizerBTOR,
+)
+from pycaliper.synth.iis_strategy import SeqStrategy
 
 from tests.specs.regblock import regblock
+from tests.specs.regblock_syn import regblock_syn
 from tests.specs.array_nonzerobase import array_nonzerobase, array_nonzerobase2
 from tests.specs.counter import counter
 from tests.specs.adder import adder
@@ -41,7 +48,7 @@ logging.basicConfig(level=logging.DEBUG, handlers=[h1, h2])
 logger = logging.getLogger(__name__)
 
 
-class TestSVAGen(unittest.TestCase):
+class SVAGenTest(unittest.TestCase):
     def gen_sva(self, mod, svafile):
         svagen = SVAGen()
         # Write to temporary file
@@ -63,7 +70,7 @@ class TestSVAGen(unittest.TestCase):
         self.gen_sva(counter(), "counter.pyc.sv")
 
 
-class TestVerifier(unittest.TestCase):
+class JGVerifierTest(unittest.TestCase):
     def gen_test(self, specpath, jgcpath):
         args = PYCArgs(
             specpath=specpath,
@@ -94,7 +101,7 @@ class TestVerifier(unittest.TestCase):
         tmgr.close()
 
 
-class TestParser(unittest.TestCase):
+class ParserTest(unittest.TestCase):
     def load_test(self, testname):
         filename = os.path.join("tests/specs.caliper", testname)
         with open(filename, "r") as f:
@@ -132,16 +139,68 @@ class TestParser(unittest.TestCase):
 
 class BTORInterfaceTest(unittest.TestCase):
     def test_btorverifier1(self):
-        prgm = mk_btordesign("regblock", "tests/btor/regblock.btor")
+        prgm = mk_btordesign("regblock", "examples/designs/regblock/btor/regblock.btor")
         engine = BTORVerifier2Trace()
         self.assertTrue(
             engine.verify(
-                regblock().instantiate(), prgm, DesignConfig(cpy1="A", cpy2="B")
-            )
+                regblock().instantiate(), prgm, DesignConfig(cpy1="a", cpy2="b")
+            ).verified
         )
 
 
-class SymbolicSimulator(unittest.TestCase):
+class SynthesisTest(unittest.TestCase):
+    def test_persynthesizer(self):
+        pyconfig, tmgr, module = start(
+            PYCTask.PERSYNTH,
+            PYCArgs(
+                specpath="tests/specs/regblock_syn.regblock_syn",
+                jgcpath="examples/designs/regblock/config_syn.json",
+                dcpath="",
+                params="",
+                sdir="",
+            ),
+        )
+        synthesizer = PERSynthesizer(
+            pyconfig=pyconfig, strategy=SeqStrategy(), fuelbudget=10, stepbudget=10
+        )
+
+        module.instantiate()
+        finalmod = synthesizer.synthesize(module, 1)
+        tmgr.save_spec(finalmod)
+        tmgr.close()
+
+    def test_jgsynthesizer(self):
+        pyconfig, tmgr, module = start(
+            PYCTask.PERSYNTH,
+            PYCArgs(
+                specpath="tests/specs/regblock_syn.regblock_syn",
+                jgcpath="examples/designs/regblock/config_syn.json",
+                dcpath="",
+                params="",
+                sdir="",
+            ),
+        )
+        synthesizer = HoudiniSynthesizerJG()
+        module.instantiate()
+        finalmod, _ = synthesizer.synthesize(
+            module, JGDesign("regblock", pyconfig), pyconfig.dc, strategy=SeqStrategy()
+        )
+        tmgr.save_spec(finalmod)
+        tmgr.close()
+
+    def test_btorsynthesizer(self):
+        prgm = mk_btordesign("regblock", "examples/designs/regblock/btor/regblock.btor")
+        synthesizer = HoudiniSynthesizerBTOR()
+        module = regblock_syn()
+        module.instantiate()
+        finalmod, status = synthesizer.synthesize(
+            module, prgm, DesignConfig(), strategy=SeqStrategy()
+        )
+        self.assertTrue(status.success)
+        self.assertTrue(finalmod is not None)
+
+
+class BMCTest(unittest.TestCase):
     def gen_test(self, specpath, jgcpath, bmc):
         args = PYCArgs(
             specpath=specpath,
@@ -198,7 +257,7 @@ class RefinementVerifierTest(unittest.TestCase):
         self.assertTrue(res)
 
 
-class ProofmanagerTest(unittest.TestCase):
+class ProofManagerTest(unittest.TestCase):
     def test_demo_btor(self):
 
         pm = ProofManager()

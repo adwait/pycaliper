@@ -146,6 +146,7 @@ endmodule
 
 def setup_jasper(mod: SpecModule, jgc: JasperConfig, dc: DesignConfig) -> bool:
 
+    setjwd(jgc.jdir)
     if dc.topmod == "":
         logger.warning("Top module name is not set, skipping Jasper setup.")
         return False
@@ -197,6 +198,5 @@ def setup_jasper(mod: SpecModule, jgc: JasperConfig, dc: DesignConfig) -> bool:
         harness = _create_proof_harness_single(mod, jgc.pycfile, harnessmod, dc)
     with open(harnessfile, "w") as f:
         f.write(harness)
-    setjwd(jgc.jdir)
 
     return True

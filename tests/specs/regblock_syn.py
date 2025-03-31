@@ -1,4 +1,4 @@
-from pycaliper.per import SpecModule, Logic
+from pycaliper.per import SpecModule, Logic, Clock
 
 
 class reg_en(SpecModule):
@@ -27,6 +27,7 @@ class regblock_syn(SpecModule):
     def __init__(self, width=32):
         super().__init__()
         self.width = width
+        self.clk = Clock()
 
         # Submodules
         self.reg1 = reg_en()

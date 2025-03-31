@@ -2,137 +2,317 @@ import logging
 import sys
 
 from btoropt import program as prg
-from ..btorinterface.pycbtorsymex import PYCBTORSymex, DesignConfig
+from btor2ex import BTOR2Ex, BoolectorSolver
+from ..pycconfig import DesignConfig
+from ..btorinterface.pycbtorinterface import PYCBTORInterface, BTORVerifResult
+from ..btorinterface.btordesign import BTORDesign
+from ..btorinterface.vcdgenerator import parse_dump_string, write_vcd
 from ..per import SpecModule, Eq, CondEq
-
-import hashlib
-import dill as pickle
 
 logger = logging.getLogger(__name__)
 
 
-class Design:
-    def __init__(self, name: str) -> None:
-        self.name = name
-
-    def __hash__(self):
-        raise NotImplementedError
-
-
-class BTORDesign(Design):
-    def __init__(self, name: str, prgm: list[prg.Instruction]) -> None:
-        self.name = name
-        self.prgm = prgm
-
-    def __hash__(self):
-        return hashlib.md5(pickle.dumps(self.prgm)).hexdigest()
-
-
-class BTORVerifier2Trace:
+class BTORVerifier2Trace(PYCBTORInterface):
     def __init__(self, gui=None) -> None:
-        self.gui = gui
+        super().__init__(gui)
 
-    def verify(
+    def _setup_inductive_two_safety(
         self,
+        prog: list[prg.Instruction],
         specmodule: SpecModule,
-        des: BTORDesign,
+        des: DesignConfig,
         dc: DesignConfig,
-    ) -> bool:
-        """
-        Perform verification for a single module of the following property:
-            input_eq && state_eq |-> ##1 output_eq && state_eq
-        """
-        assert specmodule.is_instantiated(), "Module not instantiated."
+    ):
 
-        slv = PYCBTORSymex(des.prgm, dc, specmodule, gui=self.gui)
+        self.symex = BTOR2Ex(BoolectorSolver("btor2"), prog, self.gui)
+        self.cpy1 = dc.cpy1
+        self.cpy2 = dc.cpy2
+        self.des = des
+        self.specmodule = specmodule
+        assert self.specmodule.is_instantiated(), "Module not instantiated."
 
-        if specmodule._pycinternal__perholes or specmodule._pycinternal__caholes:
+        if (
+            self.specmodule._pycinternal__perholes
+            or self.specmodule._pycinternal__caholes
+        ):
             logger.error(
                 "Holes not supported in a verifier, please use a synthesizer. Exiting."
             )
             sys.exit(1)
 
-        eq_assms = []
-        eq_assrts = []
-        condeq_assms = []
-        condeq_assrts = []
+        inv_input_assms = []
+        inv_state_assms = []
+        inv_assrts = []
 
         # Generate the assumptions and assertions
-        for p in specmodule._pycinternal__input_tt:
-            match p:
-                case Eq():
-                    eq_assms.append(p.logic)
-                case CondEq():
-                    condeq_assms.append((p.cond, p.logic))
-        for p in specmodule._pycinternal__state_tt:
-            match p:
-                case Eq():
-                    eq_assms.append(p.logic)
-                    eq_assrts.append(p.logic)
-                case CondEq():
-                    condeq_assms.append((p.cond, p.logic))
-                    condeq_assrts.append((p.cond, p.logic))
-        for p in specmodule._pycinternal__output_tt:
-            match p:
-                case Eq():
-                    eq_assrts.append(p.logic)
-                case CondEq():
-                    condeq_assrts.append((p.cond, p.logic))
+        for p in self.specmodule._pycinternal__input_invs:
+            inv_input_assms.append(p.expr)
+        for p in self.specmodule._pycinternal__state_invs:
+            inv_state_assms.append(p.expr)
+            inv_assrts.append(p.expr)
+        for p in self.specmodule._pycinternal__output_invs:
+            inv_assrts.append(p.expr)
 
-        slv.add_eq_assms(eq_assms)
-        slv.add_condeq_assms(condeq_assms)
-        slv.add_eq_assrts(eq_assrts)
-        slv.add_condeq_assrts(condeq_assrts)
+        tt_input_assms = []
+        tt_state_assms = []
+        tt_assrts = []
 
-        logger.debug(f"eq_assms: %s, eq_assrts: %s", eq_assms, eq_assrts)
+        # Generate the assumptions and assertions
+        for p in self.specmodule._pycinternal__input_tt:
+            tt_input_assms.append(p)
+        for p in self.specmodule._pycinternal__state_tt:
+            tt_state_assms.append(p)
+            tt_assrts.append(p)
+        for p in self.specmodule._pycinternal__output_tt:
+            tt_assrts.append(p)
 
-        # Perform verification
-        return slv.inductive_two_safety()
-
-
-class BTORVerifier1Trace:
-    def __init__(self, gui=None):
-        self.gui = gui
+        (kd, _) = self.specmodule.get_unroll_kind_depths()
+        logger.debug(f"Performing verification with depth %s", kd + 1)
+        return (
+            inv_input_assms,
+            inv_state_assms,
+            inv_assrts,
+            tt_input_assms,
+            tt_state_assms,
+            tt_assrts,
+            kd + 1,
+        )
 
     def verify(
         self,
         specmodule: SpecModule,
         des: BTORDesign,
         dc: DesignConfig,
-    ) -> bool:
+    ) -> BTORVerifResult:
         """
         Perform verification for a single module of the following property:
             input_eq && state_eq |-> ##1 output_eq && state_eq
+
+        Returns:
+            bool: is SAFE?
         """
-        assert specmodule.is_instantiated(), "Module not instantiated."
+        prog = des.prgm
+        (
+            inv_input_assms,
+            inv_state_assms,
+            inv_assrts,
+            tt_input_assms,
+            tt_state_assms,
+            tt_assrts,
+            k,
+        ) = self._setup_inductive_two_safety(prog, specmodule, des, dc)
 
-        slv = PYCBTORSymex(des.prgm, dc, specmodule, gui=self.gui)
+        all_assms = []
+        for i in range(k):
+            # Unroll 2k twice
+            self._internal_execute()
 
-        if specmodule._pycinternal__perholes or specmodule._pycinternal__caholes:
-            logger.warn("Holes found in a verifier, ignoring them.")
+            # Collect all assumptions
+            all_assms.extend(
+                self._get_prepost_tt_assm_constraints_at_cycle(tt_input_assms, i)
+            )
+            all_assms.extend(
+                self._get_prepost_assm_constraints_at_cycle(
+                    inv_input_assms, i, self.cpy1
+                )
+            )
+            all_assms.extend(
+                self._get_prepost_assm_constraints_at_cycle(
+                    inv_input_assms, i, self.cpy2
+                )
+            )
 
-        assms = []
-        assrts = []
+            if i < k - 1:
+                all_assms.extend(
+                    self._get_prepost_tt_assm_constraints_at_cycle(tt_state_assms, i)
+                )
+                all_assms.extend(
+                    self._get_prepost_assm_constraints_at_cycle(
+                        inv_state_assms, i, self.cpy1
+                    )
+                )
+                all_assms.extend(
+                    self._get_prepost_assm_constraints_at_cycle(
+                        inv_state_assms, i, self.cpy2
+                    )
+                )
+            else:
+                all_assms.extend(
+                    self._get_pre_tt_assm_constraints_at_cycle(tt_state_assms, i)
+                )
+                all_assms.extend(
+                    self._get_pre_assm_constraints_at_cycle(
+                        inv_state_assms, i, self.cpy1
+                    )
+                )
+                all_assms.extend(
+                    self._get_pre_assm_constraints_at_cycle(
+                        inv_state_assms, i, self.cpy2
+                    )
+                )
 
-        # Generate the assumptions and assertions
-        for p in specmodule._pycinternal__input_invs:
-            assms.append(p.expr)
-        for p in specmodule._pycinternal__state_invs:
-            assms.append(p.expr)
-            assrts.append(p.expr)
-        for p in specmodule._pycinternal__output_invs:
-            assrts.append(p.expr)
-
-        slv.add_assms(assms)
-        slv.add_assrts(assrts)
-
-        (kd, _) = specmodule.get_unroll_kind_depths()
-        logger.debug(
-            f"Performing verification with assms: %s, assrts: %s with depth %s",
-            assms,
-            assrts,
-            kd,
+        # Check final state (note that unrolling has one extra state)
+        all_assrts = []
+        all_assrts.extend(self._get_tt_assrt_constraints_at_cycle(tt_assrts, k - 1))
+        all_assrts.extend(
+            self._get_assrt_constraints_at_cycle(inv_assrts, k - 1, self.cpy1)
+        )
+        all_assrts.extend(
+            self._get_assrt_constraints_at_cycle(inv_assrts, k - 1, self.cpy2)
         )
 
-        # Perform verification
-        return slv.inductive_one_safety(k=kd)
+        clk_assms = self._get_clock_constraints()
+
+        for assrt in all_assrts:
+            for assm in all_assms:
+                self.symex.slv.mk_assume(assm)
+            for clk_assm in clk_assms:
+                self.symex.slv.mk_assume(clk_assm)
+            # Apply all internal program assumptions
+            for assmdict in self.symex.prgm_assms:
+                for _, assmi in assmdict.items():
+                    self.symex.slv.mk_assume(assmi)
+
+            self.symex.slv.push()
+            self.symex.slv.mk_assert(assrt)
+            result = self.symex.slv.check_sat()
+            logger.debug(
+                "For assertion %s, result %s", assrt, "BUG" if result else "SAFE"
+            )
+            if result:
+                logger.debug("Found a counterexample")
+                btor_model = self.symex.get_model()
+                logger.debug("Model:\n%s", btor_model)
+                vcd_content = write_vcd(btor_model.signals, btor_model.assignments)
+                res = BTORVerifResult(False, vcd_content)
+                return res
+            self.symex.slv.pop()
+
+        logger.debug("No bug found, inductive proof complete")
+        # Safe
+        return BTORVerifResult(True, None)
+
+
+class BTORVerifier1Trace(PYCBTORInterface):
+    def __init__(self, gui=None):
+        super().__init__(gui)
+
+    def _setup_inductive_one_safety(
+        self,
+        prog: list[prg.Instruction],
+        specmodule: SpecModule,
+        des: BTORDesign,
+        dc: DesignConfig,
+    ):
+        self.symex = BTOR2Ex(BoolectorSolver("btor2"), prog, self.gui)
+        self.cpy1 = dc.cpy1
+        self.cpy2 = dc.cpy2
+        self.des = des
+        self.specmodule = specmodule
+        assert self.specmodule.is_instantiated(), "Module not instantiated."
+
+        if (
+            self.specmodule._pycinternal__perholes
+            or self.specmodule._pycinternal__caholes
+        ):
+            logger.warn("Holes found in a verifier, ignoring them.")
+
+        inv_input_assms = []
+        inv_state_assms = []
+        inv_assrts = []
+
+        # Generate the assumptions and assertions
+        for p in self.specmodule._pycinternal__input_invs:
+            inv_input_assms.append(p.expr)
+        for p in self.specmodule._pycinternal__state_invs:
+            inv_state_assms.append(p.expr)
+            inv_assrts.append(p.expr)
+        for p in self.specmodule._pycinternal__output_invs:
+            inv_assrts.append(p.expr)
+
+        (kd, _) = self.specmodule.get_unroll_kind_depths()
+        logger.debug(f"Performing verification with depth %s", kd + 1)
+        return (inv_input_assms, inv_state_assms, inv_assrts, kd + 1)
+
+    def verify(
+        self,
+        specmodule: SpecModule,
+        des: BTORDesign,
+        dc: DesignConfig,
+    ) -> BTORVerifResult:
+        """
+        Perform verification for a single module of the following property:
+            input_eq && state_eq |-> ##1 output_eq && state_eq
+
+        Returns:
+            bool: is SAFE?
+        """
+        prog = des.prgm
+        (
+            inv_input_assms,
+            inv_state_assms,
+            inv_assrts,
+            k,
+        ) = self._setup_inductive_one_safety(prog, specmodule, des, dc)
+        all_assms = []
+        for i in range(k):
+            # Unroll 2k times
+            self._internal_execute()
+
+            # Collect all assumptions
+            all_assms.extend(
+                self._get_prepost_assm_constraints_at_cycle(
+                    inv_input_assms, i, self.cpy1
+                )
+            )
+
+            if i < k - 1:
+                all_assms.extend(
+                    self._get_prepost_assm_constraints_at_cycle(
+                        inv_state_assms, i, self.cpy1
+                    )
+                )
+            else:
+                all_assms.extend(
+                    self._get_pre_assm_constraints_at_cycle(
+                        inv_state_assms, i, self.cpy1
+                    )
+                )
+
+        # Check final state (note that unrolling has one extra state)
+        all_assrts = self._get_assrt_constraints_at_cycle(inv_assrts, k - 1, self.cpy1)
+
+        # Clocking behaviour
+        clk_assms = self._get_clock_constraints()
+
+        for assrt_expr, assrt in zip(inv_assrts, all_assrts):
+            for assm in all_assms:
+                # self.dump_and_wait(assm)
+                self.symex.slv.mk_assume(assm)
+            for clk_assm in clk_assms:
+                # self.dump_and_wait(clk_assm)
+                self.symex.slv.mk_assume(clk_assm)
+            for assmdict in self.symex.prgm_assms:
+                for _, assmi in assmdict.items():
+                    self.symex.slv.mk_assume(assmi)
+
+            self.symex.slv.push()
+            # self.dump_and_wait(assrt)
+            self.symex.slv.mk_assert(assrt)
+            # self.dump_and_wait(assrt)
+            result = self.symex.slv.check_sat()
+            logger.debug(
+                "For assertion %s, result %s", assrt_expr, "BUG" if result else "SAFE"
+            )
+            if result:
+                logger.debug("Found a counterexample")
+                btor_model = self.symex.get_model()
+                logger.debug("Model:\n%s", btor_model)
+                vcd_content = write_vcd(btor_model.signals, btor_model.assignments)
+                res = BTORVerifResult(False, vcd_content)
+                return res
+            self.symex.slv.pop()
+
+        logger.debug("No bug found, inductive proof complete")
+        # Safe
+        return BTORVerifResult(True, None)

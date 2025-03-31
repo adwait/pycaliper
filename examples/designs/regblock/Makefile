@@ -6,8 +6,11 @@ btor/%.btor: %.v
 
 btor: $(V_FILES:%.v=btor/%.btor)
 
-btor_full_design: $(V_FILES)
-	yosys -p "read_verilog $^; hierarchy -top miter; hierarchy -check; proc; opt; memory; flatten; clk2fflogic; write_btor btor/full_design.btor"
+btor/reg_en.btor: miter_reg_en.v regblock.v
+	yosys -p "read_verilog $^; hierarchy -top miter; hierarchy -check; proc; opt; memory; flatten; clk2fflogic; write_btor btor/reg_en.btor"
+
+btor/regblock.btor: miter_regblock.v regblock.v
+	yosys -p "read_verilog $^; hierarchy -top miter; hierarchy -check; proc; opt; memory; flatten; clk2fflogic; write_btor btor/regblock.btor"
 
 clean:
 	rm -f v/*.v btor/*.btor

@@ -13,6 +13,14 @@ class JasperConfig(BaseModel):
         return f"{self.jdir}/{self.pycfile}"
 
 
+class Design:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def __hash__(self):
+        raise NotImplementedError
+
+
 class DesignConfig(BaseModel):
     cpy1: str = "a"
     cpy2: str = "b"
