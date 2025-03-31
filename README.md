@@ -1,6 +1,6 @@
 
 
-# pycaliper: Specification, Verification, Synthesis for RTL
+# PyCaliper: RTL Formal Specification and Verification Infrastructure
 
 ## Overview
 

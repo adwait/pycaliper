@@ -1,9 +1,16 @@
 .history/
 .vscode/
 
+# Python
 __pycache__
 .python-version
 *.pyc
+*.pyo
+
+# Egg Info
+*.egg-info
+*.egg
+dist/
 
 *.log
 .run*

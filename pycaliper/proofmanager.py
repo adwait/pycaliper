@@ -128,7 +128,7 @@ class ProofManager:
     def mk_btor_design_from_file(self, file: str, name: str) -> BTORDesign:
         if name in self.designs:
             logger.warning(f"Design {name} already exists.")
-        prgm = btoropt.parse(parsewrapper(file), gui=self.gui)
+        prgm = btoropt.parse(parsewrapper(file))
         des = BTORDesign(name, prgm)
         self.designs[name] = des
 

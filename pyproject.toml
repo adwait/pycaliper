@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pycaliper"
+version = "0.0.1"
+description = "PyCaliper: RTL Formal Specification and Verification Infrastructure."
+readme = "README.md"
+authors = [{ name = "Adwait Godbole", email = "adwait@berkeley.edu" }]
+license = "BSD-3-Clause"
+keywords = ["RTL", "hardware", "formal verification", "domain-specific language", "specification", "synthesis"]
+requires-python = ">=3.11"
+dependencies = [
+    "btor2-opt==0.2.1",
+    "dill==0.3.9",
+    "flask==3.1.0",
+    "flask_socketio==5.5.1",
+    "jsonschema==4.23.0",
+    "jsonschema-specifications==2023.12.1",
+    "openai==1.60.2",
+    "ply==3.11",
+    "pre-commit==3.8.0",
+    "PyBoolector==3.2.3.20240305.1",
+    "pydantic==2.9.2",
+    "pydantic_core==2.23.4",
+    "PySMT==0.9.6",
+    "rich==13.9.3",
+    "tqdm==4.67.1",
+    "typer==0.12.5",
+    "typing_extensions==4.12.2",
+    "vcdvcd==2.3.5",
+    "virtualenv==20.26.3"
+]
+
+    [project.scripts]
+    btormiter = "pycaliper.pycmain:main"
+
+    [project.urls]
+    repository = "https://github.com/adwait/pycaliper"
+    Homepage = "https://pycaliper.github.io"
+
+    [project.optional-dependencies]
+    dev = ["black", "bumpver", "isort", "pip-tools"]
+
+
+[tool.bumpver]
+current_version = "0.1.0"
+version_pattern = "MAJOR.MINOR.PATCH"
+commit_message  = "bump version {old_version} -> {new_version}"
+commit          = true
+tag             = true
+push            = false
+
+    [tool.bumpver.file_patterns]
+    "pyproject.toml" = [
+        'current_version = "{version}"',
+        'version = "{version}"',
+    ]
+    "pycaliper/__init__.py" = ["{version}"]
+
+[tool.isort]
+profile                   = "black"
+import_heading_stdlib     = "Standard library imports"
+import_heading_thirdparty = "Third party imports"
+import_heading_firstparty = "Reader imports"
