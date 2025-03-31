@@ -15,6 +15,10 @@ Internal representation classes for PyCaliper:
         Support for SystemVerilog structs
     SpecModule:
         A module in the specification hierarchy, what else can it be?
+
+This module provides internal representation classes for PyCaliper, including PER, Logic, Struct, and SpecModule.
+
+For licensing information, please refer to the LICENSE file.
 """
 
 import logging

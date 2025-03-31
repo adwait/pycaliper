@@ -6,6 +6,11 @@ Author: Adwait Godbole, UC Berkeley
 File: per/expr.py
 
 Expression base class, and Expr operator classes
+
+This module provides the base class for expression abstract syntax trees (AST) with overloaded operators.
+Supports operations like addition, subtraction, logical operations, etc.
+
+For licensing information, please refer to the LICENSE file.
 """
 
 import logging
