@@ -1,20 +1,20 @@
 """
-    PyCaliper
+PyCaliper
 
-    Author: Adwait Godbole, UC Berkeley
+Author: Adwait Godbole, UC Berkeley
 
-    File: per/per.py
+File: per/per.py
 
-    Internal representation classes for PyCaliper:
-        PER (Partial Equivalence Relations):
-            A partial equivalence relation defined through equality and
-                conditional equality assertions.
-        Logic:
-            Single bitvectors
-        Struct:
-            Support for SystemVerilog structs
-        SpecModule:
-            A module in the specification hierarchy, what else can it be?
+Internal representation classes for PyCaliper:
+    PER (Partial Equivalence Relations):
+        A partial equivalence relation defined through equality and
+            conditional equality assertions.
+    Logic:
+        Single bitvectors
+    Struct:
+        Support for SystemVerilog structs
+    SpecModule:
+        A module in the specification hierarchy, what else can it be?
 """
 
 import logging
@@ -47,12 +47,14 @@ def nonreserved_or_fresh(name: str):
 
 @dataclass
 class Path:
-    """Path: representing a hierarchical path in the specification.
+    """
+    Path: representing a hierarchical path in the specification.
 
-    path: lis[tuple[str, list]]: at each hierarchical level, string represents identifier and
-        the list represents the indexing (if unindexed, then the index is and empty list [])
-    slicehigh: int: high index of the slice (default 0)
-    slicelow: int: low index of the slice (default 0)
+    Attributes:
+        path (list[tuple[str, list]]): At each hierarchical level, string represents identifier and
+            the list represents the indexing (if unindexed, then the index is an empty list []).
+        slicehigh (int): High index of the slice (default 0).
+        slicelow (int): Low index of the slice (default 0).
     """
 
     path: list[tuple[str, list]]
@@ -873,7 +875,7 @@ class SpecModule:
         self._pycinternal__auxregs: dict[str, AuxReg] = {}
         self._pycinternal__prev_signals = {}
         # Clock signal
-        self._pycinternal__clk: (Clock | None) = None
+        self._pycinternal__clk: Clock | None = None
 
     # Invariant functions to be overloaded by descendant specification classes
     def input(self) -> None:

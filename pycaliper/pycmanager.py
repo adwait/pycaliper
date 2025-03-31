@@ -21,28 +21,72 @@ logger = logging.getLogger(__name__)
 
 
 class PYCTask(Enum):
-    SVAGEN = 0
-    VERIF1T = 1
-    VERIF2T = 2
-    VERIFBMC = 3
-    CTRLSYNTH = 4
-    PERSYNTH = 5
-    FULLSYNTH = 6
+    """Enumeration of PyCaliper tasks.
+
+    Defines the different types of tasks that can be performed by PyCaliper.
+    """
+
+    SVAGEN = 0  #: Generate SVA specifications
+    VERIF1T = 1  #: One-trace verification
+    VERIF2T = 2  #: Two-trace verification
+    VERIFBMC = 3  #: Bounded model checking verification
+    CTRLSYNTH = 4  #: Control synthesis
+    PERSYNTH = 5  #: PER synthesis
+    FULLSYNTH = 6  #: Full synthesis
 
 
 class PYCArgs(BaseModel):
-    specpath: str = ""
-    jgcpath: str = ""
-    dcpath: str = ""
-    params: str = ""
-    sdir: str = ""
-    tdir: str = ""
-    onetrace: bool = False
-    bmc: str = ""
+    """Arguments for PyCaliper tasks.
+
+    This class defines the arguments that can be passed to PyCaliper tasks.
+    It uses Pydantic for validation and default values.
+
+    Attributes:
+        specpath (str): Path to the specification module.
+        jgcpath (str): Path to the Jasper configuration file.
+        dcpath (str): Path to the design configuration file.
+        params (str): Parameters for the specification module.
+        sdir (str): Directory to save results to.
+        tdir (str): Directory containing trace files.
+        onetrace (bool): Whether to verify only one-trace properties.
+        bmc (str): Bounded model checking configuration.
+    """
+
+    specpath: str = ""  #: Path to the specification module
+    jgcpath: str = ""  #: Path to the Jasper configuration file
+    dcpath: str = ""  #: Path to the design configuration file
+    params: str = ""  #: Parameters for the specification module
+    sdir: str = ""  #: Directory to save results to
+    tdir: str = ""  #: Directory containing trace files
+    onetrace: bool = False  #: Whether to verify only one-trace properties
+    bmc: str = ""  #: Bounded model checking configuration
 
 
 class PYCManager:
+    """Manager for PyCaliper tasks.
+
+    This class manages the execution of PyCaliper tasks, including
+    handling of temporary directories, trace files, and specification files.
+
+    Attributes:
+        pycspec (str): Name of the PyCaliper specification.
+        pyconfig (PYConfig): Configuration for the PyCaliper task.
+        sdir (str): Directory to save results to.
+        wdir (str): Working directory for the task.
+        tracedir (str): Directory for trace files.
+        specdir (str): Directory for specification files.
+        num_vcd_files (int): Number of VCD trace files.
+        traces (dict): Dictionary of trace file paths.
+        num_spec_files (int): Number of specification files.
+        specs (dict): Dictionary of specification file paths.
+    """
+
     def __init__(self, pyconfig: PYConfig):
+        """Initialize a PyCaliper manager.
+
+        Args:
+            pyconfig (PYConfig): Configuration for the PyCaliper task.
+        """
         self.pycspec: str = pyconfig.pycspec
         # Previous VCD traces directory
 
@@ -72,6 +116,14 @@ class PYCManager:
             self.gather_all_traces(pyconfig.tdir)
 
     def gather_all_traces(self, tdir):
+        """Gather all VCD trace files from a directory.
+
+        This function collects all VCD files in the specified directory
+        and copies them to the trace directory.
+
+        Args:
+            tdir (str): Directory containing VCD trace files.
+        """
         # Collect all vcd files in the directory (non-subdirs) at wdir
         for f in os.listdir(tdir):
             if f.endswith(".vcd"):
@@ -81,21 +133,44 @@ class PYCManager:
                 self.num_vcd_files += 1
 
     def create_vcd_path(self):
+        """Create a new path for a VCD trace file.
+
+        Returns:
+            str: Path to the new VCD trace file.
+        """
         path = f"{self.tracedir}/trace{self.num_vcd_files}.vcd"
         self.traces[self.num_vcd_files] = path
         self.num_vcd_files += 1
         return path
 
     def get_vcd_path(self, idx):
+        """Get the path to a VCD trace file by index.
+
+        Args:
+            idx (int): Index of the VCD trace file.
+
+        Returns:
+            str: Path to the VCD trace file.
+        """
         return self.traces[idx]
 
     def get_vcd_path_random(self):
+        """Get the path to a random VCD trace file.
+
+        Returns:
+            str: Path to a random VCD trace file, or None if no trace files are available.
+        """
         if self.num_vcd_files == 0:
             logger.warn(f"No VCD files found in directory {self.tracedir}.")
             return None
         return self.traces[random.randint(0, self.num_vcd_files - 1)]
 
     def save_spec(self, module: SpecModule):
+        """Save a specification module to a file.
+
+        Args:
+            module (SpecModule): Specification module to save.
+        """
         # Create path
         path = f"{self.specdir}/{self.pycspec}.spec{self.num_spec_files}.py"
         self.specs[self.num_spec_files] = path
@@ -107,12 +182,21 @@ class PYCManager:
         logger.info(f"Specification written to {path}.")
 
     def save(self):
+        """Save the results of the PyCaliper task.
+
+        This function copies the contents of the working directory to the
+        specified save directory.
+        """
         if self.sdir != "":
             logging.info(f"Saving to {self.sdir}")
             # Copy wdir to sdir
             os.system(f"cp -r {self.wdir}/. {self.sdir}/")
 
     def close(self):
+        """Close the PyCaliper manager.
+
+        This function saves the results and closes the Jasper socket.
+        """
         # Close the socket
         self.save()
         if not self.pyconfig.mock:
@@ -162,6 +246,14 @@ D_CONFIG_SCHEMA = {
 
 
 def get_specmodname(specmod):
+    """Extract the specification module name from a path.
+
+    Args:
+        specmod (str): Path to the specification module.
+
+    Returns:
+        str: Name of the specification module.
+    """
     if "/" in specmod:
         module_name = specmod.rsplit("/", 1)[1]
         if "." in module_name:
@@ -213,6 +305,14 @@ def create_module(specpath, args):
 
 
 def mock_or_connect(pyconfig: PYConfig) -> bool:
+    """Connect to Jasper or run in mock mode.
+
+    Args:
+        pyconfig (PYConfig): PyCaliper configuration.
+
+    Returns:
+        bool: True if connected to Jasper, False if running in mock mode.
+    """
     if pyconfig.mock:
         logger.info("Running in mock mode.")
         return False
@@ -222,6 +322,17 @@ def mock_or_connect(pyconfig: PYConfig) -> bool:
 
 
 def get_pyconfig(args: PYCArgs) -> PYConfig:
+    """Create a PyCaliper configuration from arguments.
+
+    This function creates a PyCaliper configuration from the provided arguments,
+    including loading and validating Jasper and design configurations.
+
+    Args:
+        args (PYCArgs): PyCaliper arguments.
+
+    Returns:
+        PYConfig: PyCaliper configuration.
+    """
 
     if args.jgcpath != "":
         # Create a Jasper configuration
@@ -285,6 +396,16 @@ def get_pyconfig(args: PYCArgs) -> PYConfig:
 
 
 def setup_all(args: PYCArgs) -> tuple[bool, PYConfig, PYCManager]:
+    """Set up all components for a PyCaliper task.
+
+    This function creates a PyCaliper configuration, manager, and connects to Jasper.
+
+    Args:
+        args (PYCArgs): PyCaliper arguments.
+
+    Returns:
+        tuple: Tuple of (is_connected, pyconfig, tmgr).
+    """
     pyconfig = get_pyconfig(args)
     tmgr = PYCManager(pyconfig)
     is_connected = mock_or_connect(pyconfig)
@@ -293,7 +414,18 @@ def setup_all(args: PYCArgs) -> tuple[bool, PYConfig, PYCManager]:
 
 
 def start(task: PYCTask, args: PYCArgs) -> tuple[PYConfig, PYCManager, SpecModule]:
+    """Start a PyCaliper task.
 
+    This function sets up all components for a PyCaliper task and checks that
+    the task can be run in the current mode.
+
+    Args:
+        task (PYCTask): PyCaliper task to run.
+        args (PYCArgs): PyCaliper arguments.
+
+    Returns:
+        tuple: Tuple of (pyconfig, tmgr, module).
+    """
     is_connected, pyconfig, tmgr = setup_all(args)
 
     module = create_module(args.specpath, args)
