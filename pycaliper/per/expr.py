@@ -1,11 +1,16 @@
 """
-    PyCaliper
+PyCaliper
 
-    Author: Adwait Godbole, UC Berkeley
+Author: Adwait Godbole, UC Berkeley
 
-    File: per/expr.py
+File: per/expr.py
 
-    Expression base class, and Expr operator classes
+Expression base class, and Expr operator classes
+
+This module provides the base class for expression abstract syntax trees (AST) with overloaded operators.
+Supports operations like addition, subtraction, logical operations, etc.
+
+For licensing information, please refer to the LICENSE file.
 """
 
 import logging
@@ -16,6 +21,11 @@ logger = logging.getLogger(__name__)
 
 
 class Expr:
+    """
+    Base class for expression abstract syntax trees (AST) with overloaded operators.
+    Supports operations like addition, subtraction, logical operations, etc.
+    """
+
     # PyCaliper Expression AST base class with overloaded operators.
     def __init__(self) -> None:
         pass
@@ -85,6 +95,15 @@ class Expr:
 
 
 class Op:
+    """
+    Represents an operator with a string representation, fixity, and a representation string.
+
+    Attributes:
+        opstring (str): The operator string.
+        fixity (Fixity): The fixity of the operator.
+        reprstring (str): The string for creating a representation.
+    """
+
     class Fixity(Enum):
         """Fixity of the operator; used during SVA compilation."""
 
@@ -114,218 +133,309 @@ class Op:
 
 # Unary operators
 class UnaryPlus(Op):
+    """Represents the unary plus operation."""
+
     def __init__(self) -> None:
         super().__init__("+", Op.Fixity.PREFIX, "UnaryPlus")
 
 
 class UnaryMinus(Op):
+    """Represents the unary minus operation."""
+
     def __init__(self) -> None:
         super().__init__("-", Op.Fixity.PREFIX, "UnaryMinus")
 
 
 class UnaryBitwiseAnd(Op):
+    """Represents the unary bitwise AND operation."""
+
     def __init__(self) -> None:
         super().__init__("&", Op.Fixity.PREFIX, "UnaryBitwiseAnd")
 
 
 class UnaryBitwiseNand(Op):
+    """Represents the unary bitwise NAND operation."""
+
     def __init__(self) -> None:
         super().__init__("~&", Op.Fixity.PREFIX, "UnaryBitwiseNand")
 
 
 class UnaryBitwiseOr(Op):
+    """Represents the unary bitwise OR operation."""
+
     def __init__(self) -> None:
         super().__init__("|", Op.Fixity.PREFIX, "UnaryBitwiseOr")
 
 
 class UnaryBitwiseNor(Op):
+    """Represents the unary bitwise NOR operation."""
+
     def __init__(self) -> None:
         super().__init__("~|", Op.Fixity.PREFIX, "UnaryBitwiseNor")
 
 
 class UnaryBitwiseXor(Op):
+    """Represents the unary bitwise XOR operation."""
+
     def __init__(self) -> None:
         super().__init__("^", Op.Fixity.PREFIX, "UnaryBitwiseXor")
 
 
 class UnaryBitwiseXnor(Op):
+    """Represents the unary bitwise XNOR operation."""
+
     def __init__(self) -> None:
         super().__init__("~^", Op.Fixity.PREFIX, "UnaryBitwiseXnor")
 
 
 class UnaryLogicalNot(Op):
+    """Represents the unary logical NOT operation."""
+
     def __init__(self) -> None:
         super().__init__("!", Op.Fixity.PREFIX, "UnaryLogicalNot")
 
 
 class UnaryBitwiseNot(Op):
+    """Represents the unary bitwise NOT operation."""
+
     def __init__(self) -> None:
         super().__init__("~", Op.Fixity.PREFIX, "UnaryBitwiseNot")
 
 
 # Binary operators
 class Power(Op):
+    """Represents the power operation."""
+
     def __init__(self) -> None:
         super().__init__("**", Op.Fixity.INFIX, "Power")
 
 
 class Mul(Op):
+    """Represents the multiplication operation."""
+
     def __init__(self) -> None:
         super().__init__("*", Op.Fixity.INFIX, "Mul")
 
 
 class Div(Op):
+    """Represents the division operation."""
+
     def __init__(self) -> None:
         super().__init__("/", Op.Fixity.INFIX, "Div")
 
 
 class Mod(Op):
+    """Represents the modulus operation."""
+
     def __init__(self) -> None:
         super().__init__("%", Op.Fixity.INFIX, "Mod")
 
 
 class Add(Op):
+    """Represents the addition operation."""
+
     def __init__(self) -> None:
         super().__init__("+", Op.Fixity.INFIX, "Add")
 
 
 class Sub(Op):
+    """Represents the subtraction operation."""
+
     def __init__(self) -> None:
         super().__init__("-", Op.Fixity.INFIX, "Sub")
 
 
 class LogicalShiftRight(Op):
+    """Represents the logical shift right operation."""
+
     def __init__(self) -> None:
         super().__init__(">>", Op.Fixity.INFIX, "LogicalShiftRight")
 
 
 class LogicalShiftLeft(Op):
+    """Represents the logical shift left operation."""
+
     def __init__(self) -> None:
         super().__init__("<<", Op.Fixity.INFIX, "LogicalShiftLeft")
 
 
 class ArithmeticShiftRight(Op):
+    """Represents the arithmetic shift right operation."""
+
     def __init__(self) -> None:
         super().__init__(">>>", Op.Fixity.INFIX, "ArithmeticShiftRight")
 
 
 class ArithmeticShiftLeft(Op):
+    """Represents the arithmetic shift left operation."""
+
     def __init__(self) -> None:
         super().__init__("<<<", Op.Fixity.INFIX, "ArithmeticShiftLeft")
 
 
 class LessThan(Op):
+    """Represents the less than operation."""
+
     def __init__(self) -> None:
         super().__init__("<", Op.Fixity.INFIX, "LessThan")
 
 
 class LessThanEqual(Op):
+    """Represents the less than or equal operation."""
+
     def __init__(self) -> None:
         super().__init__("<=", Op.Fixity.INFIX, "LessThanEqual")
 
 
 class GreaterThan(Op):
+    """Represents the greater than operation."""
+
     def __init__(self) -> None:
         super().__init__(">", Op.Fixity.INFIX, "GreaterThan")
 
 
 class GreaterThanEqual(Op):
+    """Represents the greater than or equal operation."""
+
     def __init__(self) -> None:
         super().__init__(">=", Op.Fixity.INFIX, "GreaterThanEqual")
 
 
 class Equality(Op):
+    """Represents the equality operation."""
+
     def __init__(self) -> None:
         super().__init__("==", Op.Fixity.INFIX, "Equality")
 
 
 class Inequality(Op):
+    """Represents the inequality operation."""
+
     def __init__(self) -> None:
         super().__init__("!=", Op.Fixity.INFIX, "Inequality")
 
 
 class CaseEquality(Op):
+    """Represents the case equality operation."""
+
     def __init__(self) -> None:
         super().__init__("===", Op.Fixity.INFIX, "CaseEquality")
 
 
 class CaseInequality(Op):
+    """Represents the case inequality operation."""
+
     def __init__(self) -> None:
         super().__init__("!==", Op.Fixity.INFIX, "CaseInequality")
 
 
 class WildcardEquality(Op):
+    """Represents the wildcard equality operation."""
+
     def __init__(self) -> None:
         super().__init__("==?", Op.Fixity.INFIX, "WildcardEquality")
 
 
 class WildcardInequality(Op):
+    """Represents the wildcard inequality operation."""
+
     def __init__(self) -> None:
         super().__init__("!=?", Op.Fixity.INFIX, "WildcardInequality")
 
 
 class BinaryAnd(Op):
+    """Represents the binary AND operation."""
+
     def __init__(self) -> None:
         super().__init__("&", Op.Fixity.INFIX, "BinaryAnd")
 
 
 class BinaryXor(Op):
+    """Represents the binary XOR operation."""
+
     def __init__(self) -> None:
         super().__init__("^", Op.Fixity.INFIX, "BinaryXor")
 
 
 class BinaryXnor(Op):
+    """Represents the binary XNOR operation."""
+
     def __init__(self) -> None:
         super().__init__("~^", Op.Fixity.INFIX, "BinaryXnor")
 
 
 class BinaryNor(Op):
+    """Represents the binary NOR operation."""
+
     def __init__(self) -> None:
         super().__init__("~^", Op.Fixity.INFIX, "BinaryNor")
 
 
 class BinaryOr(Op):
+    """Represents the binary OR operation."""
+
     def __init__(self) -> None:
         super().__init__("|", Op.Fixity.INFIX, "BinaryOr")
 
 
 class LogicalAnd(Op):
+    """Represents the logical AND operation."""
+
     def __init__(self) -> None:
         super().__init__("&&", Op.Fixity.INFIX, "LogicalAnd")
 
 
 class LogicalOr(Op):
+    """Represents the logical OR operation."""
+
     def __init__(self) -> None:
         super().__init__("||", Op.Fixity.INFIX, "LogicalOr")
 
 
 class LogicalImplication(Op):
+    """Represents the logical implication operation."""
+
     def __init__(self) -> None:
         super().__init__("->", Op.Fixity.INFIX, "LogicalImplication")
 
 
 class LogicalEquivalence(Op):
+    """Represents the logical equivalence operation."""
+
     def __init__(self) -> None:
         super().__init__("<->", Op.Fixity.INFIX, "LogicalEquivalence")
 
 
 # Special operators
 class ITE(Op):
+    """Represents the if-then-else operation."""
+
     def __init__(self) -> None:
         super().__init__("ite", Op.Fixity.ITE, "ITE")
 
 
 class Extract(Op):
+    """Represents the extract operation."""
+
     def __init__(self) -> None:
         super().__init__("extract", Op.Fixity.EXTRACT, "Extract")
 
 
 class Concat(Op):
+    """Represents the concatenation operation."""
+
     def __init__(self) -> None:
         super().__init__("++", Op.Fixity.CONCAT, "Concat")
 
 
 class OpApply(Expr):
+    """Apply an operator to a list of arguments.
+
+    Args:
+        op (Op): Operator
+        args (list): List of arguments.
+    """
+
     """Apply an operator to a list of arguments
 
     Args:
@@ -412,6 +522,13 @@ class OpApply(Expr):
 
 
 class Const(Expr):
+    """A constant value with an optional width.
+
+    Args:
+        val (int): The constant value.
+        width (int, optional): The width of the constant. Defaults to -1.
+    """
+
     """A constant value"""
 
     def __init__(self, val: int, width: int = -1) -> None:
