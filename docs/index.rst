@@ -10,6 +10,7 @@ Welcome to PyCaliper's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   setup_guide
    quickstart
    api/modules
 
