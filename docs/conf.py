@@ -31,3 +31,8 @@ html_theme_options = {
     "navigation_depth": 3,  # Adjust depth as needed
     "titles_only": True,  # Show full hierarchy in navigation
 }
+
+# Add custom CSS file
+html_css_files = [
+    "custom.css",  # Your custom CSS file
+]

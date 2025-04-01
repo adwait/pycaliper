@@ -12,6 +12,7 @@ Welcome to PyCaliper's documentation!
 
    setup_guide
    quickstart
+   verification_engines
    api/modules
 
 Indices and tables
