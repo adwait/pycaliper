@@ -1,3 +1,15 @@
+"""
+PyCaliper
+
+Author: Adwait Godbole
+
+File: verif/btorverifier.py
+
+This module provides classes for verifying BTOR designs using PyCaliper's verification framework.
+
+For licensing information, please refer to the LICENSE file.
+"""
+
 import logging
 import sys
 

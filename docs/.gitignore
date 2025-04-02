@@ -1,0 +1,13 @@
+# Ignore build artifacts
+_build/
+doctrees/
+html/
+
+# Ignore temporary files
+*.tmp
+*.log
+*.bak
+
+# Ignore editor and OS-specific files
+.DS_Store
+Thumbs.db

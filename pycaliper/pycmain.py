@@ -57,6 +57,21 @@ def verif_main(
         str, Option(help="Perform verification with bounded model checking.")
     ] = "",
 ):
+    """Verify invariants in a PyCaliper specification.
+
+    This function performs formal verification of the properties specified in a PyCaliper
+    specification class. It can perform either one-trace or two-trace verification,
+    and supports bounded model checking.
+
+    Args:
+        specpath (str): Path to the PyCaliper specification class.
+        jgcpath (str): Path to the Jasper configuration file.
+        dcpath (str): Path to the design configuration file.
+        params (str): Parameters for the specification module in the format key=value.
+        sdir (str): Directory to save verification results to.
+        onetrace (bool): If True, verify only one-trace properties.
+        bmc (str): If provided, perform verification with bounded model checking.
+    """
     args = PYCArgs(
         specpath=specpath,
         jgcpath=jgcpath,
@@ -116,6 +131,23 @@ def persynth_main(
     # Allow using --stepbudget
     stepbudget: Annotated[int, Option(help="Step budget for synthesis")] = 10,
 ):
+    """Synthesize invariants using Partial Equivalence Relations (PER).
+
+    This function performs synthesis of invariants for a PyCaliper specification
+    using the PER synthesis approach. It supports different synthesis strategies
+    and configurable parameters for the synthesis process.
+
+    Args:
+        specpath (str): Path to the PyCaliper specification class.
+        jgcpath (str): Path to the Jasper configuration file.
+        dcpath (str): Path to the design configuration file.
+        params (str): Parameters for the specification module in the format key=value.
+        sdir (str): Directory to save synthesis results to.
+        strategy (str): Strategy to use for synthesis ('seq', 'rand', or 'llm').
+        fuelbudget (int): Fuel budget for the synthesis strategy.
+        retries (int): Number of retries for synthesis.
+        stepbudget (int): Step budget for synthesis.
+    """
     args = PYCArgs(
         specpath=specpath, jgcpath=jgcpath, dcpath=dcpath, params=params, sdir=sdir
     )
@@ -159,6 +191,18 @@ def svagen_main(
     # Allow using -s or --sdir
     sdir: Annotated[str, Option(help="Directory to save results to.")] = "",
 ):
+    """Generate SystemVerilog Assertions (SVA) from a PyCaliper specification.
+
+    This function generates SVA specifications from a PyCaliper specification class.
+    The generated SVA can be used for formal verification in SystemVerilog environments.
+
+    Args:
+        specpath (str): Path to the PyCaliper specification class.
+        jgcpath (str): Path to the Jasper configuration file.
+        dcpath (str): Path to the design configuration file.
+        params (str): Parameters for the specification module in the format key=value.
+        sdir (str): Directory to save the generated SVA file to.
+    """
     args = PYCArgs(
         specpath=specpath, jgcpath=jgcpath, dcpath=dcpath, params=params, sdir=sdir
     )
@@ -171,6 +215,11 @@ def svagen_main(
 
 
 def main():
+    """Main entry point for the PyCaliper command-line interface.
+
+    This function initializes and runs the Typer application that provides
+    the command-line interface for PyCaliper.
+    """
     app()
 
 

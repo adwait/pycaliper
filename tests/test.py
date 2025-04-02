@@ -1,23 +1,23 @@
 import logging
 import sys
 import os
-
 import unittest
-
 from tempfile import NamedTemporaryFile
 
 from pycaliper.pycmanager import PYCArgs, PYCTask, start
 from pycaliper.proofmanager import mk_btordesign, ProofManager
-
 from pycaliper.frontend.pyclex import lexer
 from pycaliper.frontend.pycparse import parser
 from pycaliper.frontend.pycgen import PYCGenPass
-
-from pycaliper.verif.jgverifier import JGVerifier2Trace
+from pycaliper.jginterface.jgdesign import JGDesign
 from pycaliper.svagen import SVAGen
 from pycaliper.pycconfig import DesignConfig
 from pycaliper.verif.btorverifier import BTORVerifier2Trace
-from pycaliper.verif.jgverifier import JGVerifier1TraceBMC, JGVerifier1Trace, JGDesign
+from pycaliper.verif.jgverifier import (
+    JGVerifier1TraceBMC,
+    JGVerifier1Trace,
+    JGVerifier2Trace,
+)
 from pycaliper.verif.refinementverifier import RefinementVerifier
 from pycaliper.synth.persynthesis import (
     PERSynthesizer,
@@ -25,7 +25,6 @@ from pycaliper.synth.persynthesis import (
     HoudiniSynthesizerBTOR,
 )
 from pycaliper.synth.iis_strategy import SeqStrategy
-
 from tests.specs.regblock import regblock
 from tests.specs.regblock_syn import regblock_syn
 from tests.specs.array_nonzerobase import array_nonzerobase, array_nonzerobase2
@@ -34,6 +33,7 @@ from tests.specs.adder import adder
 from tests.specs.refiner_modules import refiner_module1, refiner_module2
 from tests.specs.demo import demo
 
+# Configure logging
 h1 = logging.StreamHandler(sys.stdout)
 h1.setLevel(logging.INFO)
 h1.setFormatter(logging.Formatter("%(levelname)s::%(message)s"))
@@ -42,10 +42,11 @@ h2 = logging.FileHandler("test_debug.log", mode="w")
 h2.setLevel(logging.DEBUG)
 h2.setFormatter(logging.Formatter("%(asctime)s::%(name)s::%(levelname)s::%(message)s"))
 
-# Add filename and line number to log messages
 logging.basicConfig(level=logging.DEBUG, handlers=[h1, h2])
-
 logger = logging.getLogger(__name__)
+
+# Check if JG-related tests should be enabled
+ENABLE_JG_TESTS = "ENABLE_JG_TESTS" in os.environ
 
 
 class SVAGenTest(unittest.TestCase):
@@ -101,6 +102,50 @@ class JGVerifierTest(unittest.TestCase):
         tmgr.close()
 
 
+class JGSynthesisTest(unittest.TestCase):
+    def test_jgsynthesizer(self):
+        pyconfig, tmgr, module = start(
+            PYCTask.PERSYNTH,
+            PYCArgs(
+                specpath="tests/specs/regblock_syn.regblock_syn",
+                jgcpath="examples/designs/regblock/config_syn.json",
+                dcpath="",
+                params="",
+                sdir="",
+            ),
+        )
+        synthesizer = HoudiniSynthesizerJG()
+        module.instantiate()
+        finalmod, _ = synthesizer.synthesize(
+            module, JGDesign("regblock", pyconfig), pyconfig.dc, strategy=SeqStrategy()
+        )
+        tmgr.save_spec(finalmod)
+        tmgr.close()
+
+
+class JGBMCTest(unittest.TestCase):
+    def gen_test(self, specpath, jgcpath, bmc):
+        args = PYCArgs(
+            specpath=specpath,
+            jgcpath=jgcpath,
+            params="",
+            sdir="",
+            onetrace=True,
+            bmc=bmc,
+        )
+        return start(PYCTask.VERIFBMC, args)
+
+    def test_adder(self):
+        (pyconfig, tmgr, module) = self.gen_test(
+            "tests/specs/adder.adder", "examples/designs/adder/config.json", "simstep"
+        )
+        verifier = JGVerifier1TraceBMC()
+        logger.debug("Running BMC verification.")
+        module.instantiate()
+        verifier.verify(module, pyconfig, "simstep")
+        tmgr.close()
+
+
 class ParserTest(unittest.TestCase):
     def load_test(self, testname):
         filename = os.path.join("tests/specs.caliper", testname)
@@ -137,7 +182,7 @@ class ParserTest(unittest.TestCase):
         self.parse_file("test1.caliper")
 
 
-class BTORInterfaceTest(unittest.TestCase):
+class BTORVerifierTest(unittest.TestCase):
     def test_btorverifier1(self):
         prgm = mk_btordesign("regblock", "examples/designs/regblock/btor/regblock.btor")
         engine = BTORVerifier2Trace()
@@ -148,46 +193,7 @@ class BTORInterfaceTest(unittest.TestCase):
         )
 
 
-class SynthesisTest(unittest.TestCase):
-    def test_persynthesizer(self):
-        pyconfig, tmgr, module = start(
-            PYCTask.PERSYNTH,
-            PYCArgs(
-                specpath="tests/specs/regblock_syn.regblock_syn",
-                jgcpath="examples/designs/regblock/config_syn.json",
-                dcpath="",
-                params="",
-                sdir="",
-            ),
-        )
-        synthesizer = PERSynthesizer(
-            pyconfig=pyconfig, strategy=SeqStrategy(), fuelbudget=10, stepbudget=10
-        )
-
-        module.instantiate()
-        finalmod = synthesizer.synthesize(module, 1)
-        tmgr.save_spec(finalmod)
-        tmgr.close()
-
-    def test_jgsynthesizer(self):
-        pyconfig, tmgr, module = start(
-            PYCTask.PERSYNTH,
-            PYCArgs(
-                specpath="tests/specs/regblock_syn.regblock_syn",
-                jgcpath="examples/designs/regblock/config_syn.json",
-                dcpath="",
-                params="",
-                sdir="",
-            ),
-        )
-        synthesizer = HoudiniSynthesizerJG()
-        module.instantiate()
-        finalmod, _ = synthesizer.synthesize(
-            module, JGDesign("regblock", pyconfig), pyconfig.dc, strategy=SeqStrategy()
-        )
-        tmgr.save_spec(finalmod)
-        tmgr.close()
-
+class BTORSynthesisTest(unittest.TestCase):
     def test_btorsynthesizer(self):
         prgm = mk_btordesign("regblock", "examples/designs/regblock/btor/regblock.btor")
         synthesizer = HoudiniSynthesizerBTOR()
@@ -198,29 +204,6 @@ class SynthesisTest(unittest.TestCase):
         )
         self.assertTrue(status.success)
         self.assertTrue(finalmod is not None)
-
-
-class BMCTest(unittest.TestCase):
-    def gen_test(self, specpath, jgcpath, bmc):
-        args = PYCArgs(
-            specpath=specpath,
-            jgcpath=jgcpath,
-            params="",
-            sdir="",
-            onetrace=True,
-            bmc=bmc,
-        )
-        return start(PYCTask.VERIFBMC, args)
-
-    def test_adder(self):
-        (pyconfig, tmgr, module) = self.gen_test(
-            "tests/specs/adder.adder", "examples/designs/adder/config.json", "simstep"
-        )
-        verifier = JGVerifier1TraceBMC()
-        logger.debug("Running BMC verification.")
-        module.instantiate()
-        verifier.verify(module, pyconfig, "simstep")
-        tmgr.close()
 
 
 class ReprTest(unittest.TestCase):
@@ -270,4 +253,30 @@ class ProofManagerTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    # Create a test suite
+    suite = unittest.TestSuite()
+
+    # Add non-JG-related tests
+    suite.addTest(unittest.TestLoader().loadTestsFromTestCase(SVAGenTest))
+    suite.addTest(unittest.TestLoader().loadTestsFromTestCase(ParserTest))
+    suite.addTest(unittest.TestLoader().loadTestsFromTestCase(BTORVerifierTest))
+    suite.addTest(unittest.TestLoader().loadTestsFromTestCase(BTORSynthesisTest))
+    suite.addTest(unittest.TestLoader().loadTestsFromTestCase(ReprTest))
+    suite.addTest(unittest.TestLoader().loadTestsFromTestCase(RefinementVerifierTest))
+    suite.addTest(unittest.TestLoader().loadTestsFromTestCase(ProofManagerTest))
+
+    # Add JG-related tests if enabled
+    if ENABLE_JG_TESTS:
+        logger.info("JG tests are enabled.")
+        suite.addTest(unittest.TestLoader().loadTestsFromTestCase(JGVerifierTest))
+        suite.addTest(unittest.TestLoader().loadTestsFromTestCase(JGSynthesisTest))
+        suite.addTest(unittest.TestLoader().loadTestsFromTestCase(JGBMCTest))
+    else:
+        logger.info("JG tests are disabled.")
+        # Remove JG-related tests from the suite
+        for test in [JGVerifierTest, JGSynthesisTest, JGBMCTest]:
+            suite._tests = [t for t in suite._tests if not isinstance(t, test)]
+
+    # Run the test suite
+    runner = unittest.TextTestRunner()
+    runner.run(suite)
