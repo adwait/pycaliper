@@ -257,5 +257,5 @@ class BTORVerifier2TraceIncremental(PYCBTORInterface):
                 vcd_content = write_vcd(btor_model.signals, btor_model.assignments)
                 res = BTORVerifResult(False, vcd_content)
                 return res
-        self.symex.slv.pop()
+            self.symex.slv.pop()
         return BTORVerifResult(True, None)
