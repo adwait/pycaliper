@@ -2,111 +2,108 @@
 
 # PyCaliper: RTL Formal Specification and Verification Infrastructure
 
-## Overview
-
 PyCaliper provides infrastructure for verifying and synthesizing specifications for RTL designs based on the Caliper specification language.
 
+----
 
 
-## Requirements and Basic Setup
 
-PyCaliper has been developed and tested with Python 3.11. We recommend using a [virtual-environment](https://github.com/pyenv/pyenv). PyCaliper currently requires access to the Jasper FV tool for utilizing its full featureset. However, we are working towards extending full support with open-source tools.
+## Requirements and Setup
 
-PyCaliper requires a minimal setup.
+PyCaliper has been developed and tested with Python 3.11. We recommend using a [virtual-environment](https://github.com/pyenv/pyenv). PyCaliper can be run without building (see [no-build] below) or by building the package (see [install] below).
 
-0. Clone this repository:
 
+### No-build
+
+0. Clone this repository and the `btor2ex` package that provides a symbolic simulator for `btor2`.
+
+```bash
+git clone https://github.com/adwait/pycaliper.git
+git clone https://github.com/adwait/btor2ex.git
 ```
-git clone https://github.com/IntelLabs/pycaliper
-```
 
-1. Install all `pip` packages using the `requirements.txt`
+1. Install all Python packages using the `requirements.txt`, making sure to use the virtual environment. For example, using `pip`:
 
-```
+```bash
 pip install -r requirements.txt
 ```
-in your venv or
-```
-python3 -m pip install -r requirements.txt
-```
-in a non-virtual-environment setup.
 
-2. Update submodules:
 
-```
-git submodule update --init --recursive
+3. Add `pycaliper` and `btor2ex` to your `PYTHONPATH`. For example, in `bash`:
+
+```bash
+export PYTHONPATH=$PYTHONPATH:$(pwd)/pycaliper
+export PYTHONPATH=$PYTHONPATH:$(pwd)/btor2ex
 ```
 
-3. (optional) Make sure all tests pass
+4. (optional) Run tests
 
-```
+```bash
+cd pycaliper
 python3 -m unittest tests/test.py
+```
+
+
+### Build and install
+
+1. Clone this repository and the `btor2ex` package as above:
+
+```bash
+git clone https://github.com/adwait/pycaliper.git
+git clone https://github.com/adwait/btor2ex.git
+```
+
+2. Install both packages using the `pyproject.toml`, making sure to use the virtual environment. For example, using `pip`:
+
+```bash
+cd <path to pycaliper>
+pip install .
+cd <path to btor2ex>
+pip install .
 ```
 
 
 ## Basic Use
 
+### Quickstart
 
-#### Set up the Jasper FV Backend
+The `quickstart.py` script provides a simple example of how to use PyCaliper. It checks the design from the `examples/designs/demo` directory. 
+It uses the PyCaliper `demos` specification from the `tests/specs/demo.py` file. 
 
-Launch Jasper with the `jasperserver.tcl` server script
-```
-include jasperserver.tcl
-```
-and start the Jasper server (on port 8080)
-```
-jg_start_server 8080
+```bash
+python quickstart.py
 ```
 
-#### PyCaliper Script and Options
+This examples uses the BTOR backend (using the `btor2ex` package) to check the design. 
+PyCaliper also supports the Jasper backend.
 
-Run the `pycmain.py` script:
 
-```
- $ python3 pycmain.py -h
-usage: pycmain.py [-h] [-m] [--params PARAMS [PARAMS ...]]
-                  [-s SDIR]
-                  {verif,persynth,svagen,alignsynth,fullsynth}
-                  ... path
+#### PyCaliper Tool Script
 
-Invariant verification and synthesis using Jasper.
+Run the `main` script (after installing PyCaliper) to see the available commands:
 
-positional arguments:
-  {verif,persynth,svagen,alignsynth,fullsynth}
-    verif               Verify invariants.
-    persynth            Synthesize invariants.
-    svagen              Generate SVA spec file.
-    alignsynth          Synthesize counter alignment.
-    fullsynth           Synthesize 1t invariants followed
-                        by (cond)equality ones.
-  path                  Path to the JSON config file
+```bash
+$ pycaliper --help
 
-options:
-  -h, --help            show this help message and exit
-  -m, --mock            Run in mock mode (without Jasper access)
-  --params PARAMS [PARAMS ...]
-                        Parameters for the spec module:
-                        (<key>=<intvalue>)+
-  -s SDIR, --sdir SDIR  Directory to save results to.
+ Usage: pycaliper [OPTIONS] COMMAND [ARGS]...
+
+ PyCaliper: Specification Synthesis and Verification Infrastructure.
+
+╭─ Options ───────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ --install-completion          Install completion for the current shell.                                         │
+│ --show-completion             Show completion for the current shell, to copy it or customize the installation.  │
+│ --help                        Show this message and exit.                                                       │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ──────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ persynth   Synthesize invariants using Partial Equivalence Relations (PER).                                     │
+│ svagen     Generate SystemVerilog Assertions (SVA) from a PyCaliper specification.                              │
+│ verif      Verify invariants in a PyCaliper specification.                                                      │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
-For example,
+## API and Tool Documentation
 
-```
-python3 pycmain.py -m svagen designs/regblock/config.json
-```
-
-#### The `config.json` file
-
-The `config.json` file identifies configuration paths and options for backends (e.g., Jasper) and the design. It also identifies the specification file. More details on the specification file below.
-
-## PyCaliper Specifications
-
-PyCaliper specifications are Python classes inheriting from the abstract `Module` class. See examples in `specs/regblock.py`. The class declares signals in its `__init__` function. Further the `input`, `output` and `state` functions define input assumptions, output assertions and state invariants respectively.
-
-
-
-
+We provide a [documentation site](https://pycaliper.github.io) for PyCaliper.
 
 
 ## Contributing
