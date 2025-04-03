@@ -1,7 +1,7 @@
 """
 PyCaliper
 
-Author: Adwait Godbole
+Author: Adwait Godbole, UC Berkeley
 
 File: verif/btorverifier.py
 
@@ -18,8 +18,8 @@ from btor2ex import BTOR2Ex, BoolectorSolver
 from ..pycconfig import DesignConfig
 from ..btorinterface.pycbtorinterface import PYCBTORInterface, BTORVerifResult
 from ..btorinterface.btordesign import BTORDesign
-from ..btorinterface.vcdgenerator import parse_dump_string, write_vcd
-from ..per import SpecModule, Eq, CondEq
+from ..btorinterface.vcdgenerator import write_vcd
+from ..per import SpecModule
 
 logger = logging.getLogger(__name__)
 

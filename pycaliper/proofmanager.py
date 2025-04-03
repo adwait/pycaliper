@@ -13,7 +13,7 @@ from pycaliper.btorinterface.btordesign import BTORDesign
 from pycaliper.verif.btorverifier import BTORVerifier1Trace
 from pycaliper.verif.refinementverifier import RefinementMap, RefinementVerifier
 
-from btor2ex.btor2ex.utils import parsewrapper
+from btor2ex.utils import parsewrapper
 
 from dataclasses import dataclass
 

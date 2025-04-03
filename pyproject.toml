@@ -34,7 +34,7 @@ dependencies = [
 ]
 
     [project.scripts]
-    btormiter = "pycaliper.pycmain:main"
+    pycaliper = "pycaliper.pycmain:main"
 
     [project.urls]
     repository = "https://github.com/adwait/pycaliper"
@@ -43,6 +43,13 @@ dependencies = [
     [project.optional-dependencies]
     dev = ["black", "bumpver", "isort", "pip-tools"]
 
+[tool.setuptools]
+# Tell setuptools that your package files are found in the "toolname" directory.
+package-dir = {"" = "pycaliper"}
+
+[tool.setuptools.packages.find]
+# Search for packages only inside the given folder.
+where = ["pycaliper"]
 
 [tool.bumpver]
 current_version = "0.1.0"
