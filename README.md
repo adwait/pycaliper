@@ -40,7 +40,7 @@ export PYTHONPATH=$PYTHONPATH:$(pwd)/btor2ex
 
 ```bash
 cd pycaliper
-python3 -m unittest tests/test.py
+python3 -m tests.test
 ```
 
 
