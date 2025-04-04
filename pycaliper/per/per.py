@@ -1,9 +1,9 @@
 """
-PyCaliper
+File: pycaliper/per/per.py
+This file is a part of the PyCaliper tool.
+See LICENSE.md for licensing information.
 
 Author: Adwait Godbole, UC Berkeley
-
-File: per/per.py
 
 Internal representation classes for PyCaliper:
     PER (Partial Equivalence Relations):
@@ -17,8 +17,6 @@ Internal representation classes for PyCaliper:
         A module in the specification hierarchy, what else can it be?
 
 This module provides internal representation classes for PyCaliper, including PER, Logic, Struct, and SpecModule.
-
-For licensing information, please refer to the LICENSE file.
 """
 
 import logging

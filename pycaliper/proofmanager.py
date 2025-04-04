@@ -1,3 +1,12 @@
+"""
+File: pycaliper/proofmanager.py
+
+This file is a part of the PyCaliper tool.
+See LICENSE.md for licensing information.
+
+Author: Adwait Godbole, UC Berkeley
+"""
+
 from typing import Callable
 
 from pycaliper.pycmanager import mock_or_connect
@@ -83,13 +92,28 @@ class SSRefinementPR(ProofResult):
         )
 
 
-def mk_btordesign(name: str, filename: str):
+def mk_btordesign(name: str, filename: str) -> BTORDesign:
+    """Creates a BTORDesign from a file.
+
+    Args:
+        name (str): The name of the design.
+        filename (str): The filename of the BTOR file.
+
+    Returns:
+        BTORDesign: The created BTORDesign object.
+    """
     prgm = btoropt.parse(parsewrapper(filename))
     return BTORDesign(name, prgm)
 
 
 class ProofManager:
     def __init__(self, webgui=False, cligui=False) -> None:
+        """Initializes the ProofManager.
+
+        Args:
+            webgui (bool, optional): Whether to use the web GUI. Defaults to False.
+            cligui (bool, optional): Whether to use the CLI GUI. Defaults to False.
+        """
         self.proofs: list[ProofResult] = []
         self.designs: dict[str, Design] = {}
         self.specs: dict[str, SpecModule] = {}
@@ -103,11 +127,26 @@ class ProofManager:
         else:
             self.gui = None
 
-    def _push_update(self, data: GUIPacket):
+    def _push_update(self, data: GUIPacket) -> None:
+        """Pushes an update to the GUI.
+
+        Args:
+            data (GUIPacket): The data to push.
+        """
         if self.gui:
             self.gui.push_update(data)
 
-    def mk_spec(self, spec: SpecModule.__class__, name: str, **kwargs):
+    def mk_spec(self, spec: SpecModule.__class__, name: str, **kwargs) -> SpecModule:
+        """Creates a specification module.
+
+        Args:
+            spec (SpecModule.__class__): The specification module class.
+            name (str): The name of the specification.
+            **kwargs: Additional keyword arguments for the specification.
+
+        Returns:
+            SpecModule: The created specification module.
+        """
         if name in self.specs:
             logger.warning(f"Spec {name} already exists.")
 
@@ -126,6 +165,15 @@ class ProofManager:
         return new_spec
 
     def mk_btor_design_from_file(self, file: str, name: str) -> BTORDesign:
+        """Creates a BTORDesign from a file.
+
+        Args:
+            file (str): The filename of the BTOR file.
+            name (str): The name of the design.
+
+        Returns:
+            BTORDesign: The created BTORDesign object.
+        """
         if name in self.designs:
             logger.warning(f"Design {name} already exists.")
         prgm = btoropt.parse(parsewrapper(file))
@@ -138,6 +186,15 @@ class ProofManager:
         return des
 
     def mk_jg_design_from_pyc(self, name: str, pyc: PYConfig) -> Design:
+        """Creates a JGDesign from a PYConfig.
+
+        Args:
+            name (str): The name of the design.
+            pyc (PYConfig): The PYConfig object.
+
+        Returns:
+            Design: The created JGDesign object.
+        """
         if name in self.designs:
             logger.warning(f"Design {name} already exists.")
         des = JGDesign(name, pyc)
@@ -156,6 +213,16 @@ class ProofManager:
         design: Design | str,
         dc: DesignConfig = DesignConfig(),
     ) -> ProofResult:
+        """Creates a BTOR proof for one trace.
+
+        Args:
+            spec (SpecModule | str): The specification module or name.
+            design (Design | str): The design or name.
+            dc (DesignConfig, optional): The design configuration. Defaults to DesignConfig().
+
+        Returns:
+            ProofResult: The result of the proof.
+        """
         if isinstance(spec, str):
             if spec not in self.specs:
                 raise ValueError(f"Spec {spec} not found.")
@@ -183,6 +250,16 @@ class ProofManager:
     def mk_jg_proof_bounded_spec(
         self, spec: SpecModule | str, design: Design | str, sched: Callable | str
     ) -> ProofResult:
+        """Creates a JG proof for a bounded specification.
+
+        Args:
+            spec (SpecModule | str): The specification module or name.
+            design (Design | str): The design or name.
+            sched (Callable | str): The schedule or name.
+
+        Returns:
+            ProofResult: The result of the proof.
+        """
         if isinstance(spec, str):
             if spec not in self.specs:
                 raise ValueError(f"Spec {spec} not found.")
@@ -222,7 +299,17 @@ class ProofManager:
 
     def check_mm_refinement(
         self, spec1: SpecModule | str, spec2: SpecModule | str, rmap: RefinementMap
-    ):
+    ) -> ProofResult:
+        """Checks MM refinement between two specifications.
+
+        Args:
+            spec1 (SpecModule | str): The first specification module or name.
+            spec2 (SpecModule | str): The second specification module or name.
+            rmap (RefinementMap): The refinement map.
+
+        Returns:
+            ProofResult: The result of the refinement check.
+        """
         if isinstance(spec1, str):
             if spec1 not in self.specs:
                 raise ValueError(f"Spec {spec1} not found.")
@@ -254,14 +341,16 @@ class ProofManager:
         sched2: Callable | str,
         flip: bool = False,
     ) -> ProofResult:
-        """
-        Check if bounded schedule sched1 refines sched2. If flip is True, then the assertions are flipped in sched1.
+        """Checks SS refinement between two schedules.
 
         Args:
-            spec (SpecModule | str): The spec to use.
-            sched1 (Callable | str): The first schedule to check.
-            sched2 (Callable | str): The second schedule to check.
-            flip (bool, optional): Flip the assertions in sched1. Defaults to False.
+            spec (SpecModule | str): The specification module or name.
+            sched1 (Callable | str): The first schedule or name.
+            sched2 (Callable | str): The second schedule or name.
+            flip (bool, optional): Whether to flip the assertions in sched1. Defaults to False.
+
+        Returns:
+            ProofResult: The result of the refinement check.
         """
         if isinstance(spec, str):
             if spec not in self.specs:

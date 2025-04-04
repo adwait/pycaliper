@@ -1,3 +1,12 @@
+"""
+File: pycaliper/pycmain.py
+
+This file is a part of the PyCaliper tool.
+See LICENSE.md for licensing information.
+
+Author: Adwait Godbole, UC Berkeley
+"""
+
 import sys
 import logging
 

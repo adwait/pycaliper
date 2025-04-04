@@ -1,3 +1,12 @@
+"""
+File: pycaliper/pycconfig.py
+
+This file is a part of the PyCaliper tool.
+See LICENSE.md for licensing information.
+
+Author: Adwait Godbole, UC Berkeley
+"""
+
 from pydantic import BaseModel
 
 
@@ -23,8 +32,8 @@ class JasperConfig(BaseModel):
     design_list: str = "design.lst"
     port: int = 8080
 
-    def pycfile_abspath(self):
-        """Get the absolute path to the PyCaliper specification file.
+    def pycfile_abspath(self) -> str:
+        """Gets the absolute path to the PyCaliper specification file.
 
         Returns:
             str: Absolute path to the PyCaliper specification file.
@@ -42,15 +51,15 @@ class Design:
     """
 
     def __init__(self, name: str) -> None:
-        """Initialize a design.
+        """Initializes a design.
 
         Args:
-            name: Name of the design.
+            name (str): Name of the design.
         """
         self.name = name
 
     def __hash__(self):
-        """Hash function for Design objects.
+        """Hashes the Design object.
 
         Raises:
             NotImplementedError: This method must be implemented by subclasses.

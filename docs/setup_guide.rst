@@ -9,21 +9,20 @@ Before you begin, ensure you have the following installed on your system:
 - **Git**: To clone the repository.
 - **Python**: Ensure you have Python 3.11 or later and ``pip`` installed.
 
-Step 1: Clone the Repository
-----------------------------
+Step 1: Clone the Repositories
+------------------------------
 
-First, clone the repository from GitHub. Open your terminal and run the following command:
+First, clone the PyCaliper and btor2ex repositories from GitHub. Open your terminal and run the following commands:
 
 .. code-block:: bash
 
-   git clone https://github.com/pycaliper/pycaliper
-   cd pycaliper
+   git clone https://github.com/adwait/pycaliper.git
+   git clone https://github.com/adwait/btor2ex.git
 
-
-Now either perform a quik setup (Step 2a) or build the package (Step 2b).
+Now either perform a quick setup (Step 2a) or build the package (Step 2b).
 
 Step 2a (quick, no build): Add to ``PYTHONPATH``
------------------------------------------------------------
+------------------------------------------------
 
 1. Create a virtual environment (e.g., using ``pyenv``), and install dependencies using:
 
@@ -31,23 +30,31 @@ Step 2a (quick, no build): Add to ``PYTHONPATH``
 
       pip install -r requirements.txt
 
-2. To ensure that the ``pycaliper`` module is accessible, add its path to the ``PYTHONPATH`` environment variable. You can do this by running the following command in your terminal:
+2. To ensure that the ``pycaliper`` and ``btor2ex`` modules are accessible, add their paths to the ``PYTHONPATH`` environment variable. You can do this by running the following commands in your terminal:
 
    .. code-block:: bash
 
-      export PYTHONPATH=$(pwd):$PYTHONPATH
+      export PYTHONPATH=$PYTHONPATH:$(pwd)/pycaliper
+      export PYTHONPATH=$PYTHONPATH:$(pwd)/btor2ex
 
-Step 2b (build): Build and Install the Package
-------------------------------------------------
+3. (optional) Run tests to verify the setup:
 
-Set up the virtual environment as before. Now install the project using ``pyproject.toml`` with ``build`` (or an alternative package manager such as ``poetry``). For example:
+   .. code-block:: bash
+
+      cd pycaliper
+      python3 -m tests.test
+
+Step 2b (build): Build and Install the Packages
+-----------------------------------------------
+
+Set up the virtual environment as before. Now install the projects using ``pyproject.toml``. For example:
 
 .. code-block:: bash
 
-   # Install build if not already installed
-   pip install build
-   # Build the package
-   python -m build
+   cd <path to pycaliper>
+   pip install .
+   cd <path to btor2ex>
+   pip install .
 
 Step 3: Verify the Installation
 -------------------------------

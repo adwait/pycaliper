@@ -1,4 +1,11 @@
 """
+File: pycaliper/synth/persynthesis.py
+See LICENSE.md for licensing information.
+
+Author: Adwait Godbole, UC Berkeley
+"""
+
+"""
     Synthesis for equality invariants using Jasper FV Interface
 """
 
@@ -31,10 +38,19 @@ logger = logging.getLogger(__name__)
 
 
 class SynthesisTree:
+    """Represents a node in the synthesis tree."""
 
     counter = 0
 
     def __init__(self, asrts=[], assms=[], parent=None, inherits=None):
+        """Initialize a SynthesisTree node.
+
+        Args:
+            asrts (list[str]): Assertions for the node.
+            assms (list[str]): Assumptions for the node.
+            parent (SynthesisTree, optional): Parent node.
+            inherits (str, optional): Inherited assertion.
+        """
         self.children: dict[str, SynthesisTree] = {}
         self.parent = parent
         self.inherits = inherits
@@ -51,13 +67,31 @@ class SynthesisTree:
         self.checked = False
 
     def add_child(self, cand):
+        """Add a child node for a candidate.
+
+        Args:
+            cand (str): The candidate to add as a child.
+        """
         self.children[cand] = SynthesisTree(self.asrts, self.assms, self, cand)
 
     def add_asrt(self, asrt):
+        """Add an assertion to the node.
+
+        Args:
+            asrt (str): The assertion to add.
+        """
         self.asrts.append(asrt)
         self.fuel += 1
 
     def add_secondary_assm(self, assm):
+        """Add a secondary assumption to the node.
+
+        Args:
+            assm (str): The assumption to add.
+
+        Returns:
+            bool: True if the assumption was added, False otherwise.
+        """
         if assm not in self.assms:
             self.assms.append(assm)
             self.fuel -= 1
@@ -66,6 +100,11 @@ class SynthesisTree:
         return False
 
     def is_self_inductive(self):
+        """Check if the node is self-inductive.
+
+        Returns:
+            bool: True if the node is self-inductive, False otherwise.
+        """
         return set(self.assms) == set(self.asrts)
 
     def __str__(self) -> str:
@@ -74,6 +113,8 @@ class SynthesisTree:
 
 @dataclass
 class HoudiniSynthesizerConfig:
+    """Configuration for the Houdini synthesizer."""
+
     fuelbudget: int = 10
     stepbudget: int = 10
     retries: int = 1
@@ -81,6 +122,8 @@ class HoudiniSynthesizerConfig:
 
 @dataclass
 class HoudiniSynthesizerStats:
+    """Statistics for the Houdini synthesizer."""
+
     solvecalls: int
     steps: int
     minfuel: int
@@ -88,7 +131,10 @@ class HoudiniSynthesizerStats:
 
 
 class HoudiniSynthesizer:
+    """Houdini synthesizer for invariant synthesis."""
+
     def __init__(self):
+        """Initialize the HoudiniSynthesizer."""
         self.strategy = None
         self.synconfig: HoudiniSynthesizerConfig = None
         self.ctx = ""
@@ -106,24 +152,50 @@ class HoudiniSynthesizer:
         self.candidates: dict[str, Logic] = {}
 
     def _setup_synthesis(self):
+        """Set up the synthesis process."""
         raise NotImplementedError
 
     def _restart_synthesis(self):
+        """Restart the synthesis process."""
         raise NotImplementedError
 
     def _can_add(self, cand) -> bool:
+        """Check if a candidate can be added.
+
+        Args:
+            cand (str): The candidate to check.
+
+        Returns:
+            bool: True if the candidate can be added, False otherwise.
+        """
         raise NotImplementedError
 
     def _enable_assm(self, assm):
+        """Enable an assumption.
+
+        Args:
+            assm (str): The assumption to enable.
+        """
         raise NotImplementedError
 
     def _disable_assm(self, assm):
+        """Disable an assumption.
+
+        Args:
+            assm (str): The assumption to disable.
+        """
         raise NotImplementedError
 
     def _check_safe(self) -> bool:
+        """Check if the current state is safe.
+
+        Returns:
+            bool: True if the state is safe, False otherwise.
+        """
         raise NotImplementedError
 
     def _saturate(self):
+        """Saturate the current synthesis state."""
         added = True
         while added:
             added = False
@@ -139,6 +211,11 @@ class HoudiniSynthesizer:
                         break
 
     def _dive(self, cand):
+        """Dive into a new synthesis state.
+
+        Args:
+            cand (str): The candidate to dive into.
+        """
         self.synstate.add_child(cand)
         self.synstate = self.synstate.children[cand]
         logger.debug(f"Dived to new state: {self.synstate} on candidate: {cand}")
@@ -154,6 +231,11 @@ class HoudiniSynthesizer:
         )
 
     def _backtrack(self):
+        """Backtrack to the previous synthesis state.
+
+        Returns:
+            bool: True if backtracking was successful, False otherwise.
+        """
         if self.synstate.parent is not None:
             cand = self.synstate.inherits
             secondaries = self.synstate.secondaries
@@ -173,6 +255,11 @@ class HoudiniSynthesizer:
             return False
 
     def _safe(self):
+        """Check if the current synthesis state is safe.
+
+        Returns:
+            bool: True if the state is safe, False otherwise.
+        """
         if not self.synstate.checked:
             self.synstate.checked = True
             self.solvecalls += 1
@@ -180,6 +267,14 @@ class HoudiniSynthesizer:
         return False
 
     def _synthesize(self, candidate_order):
+        """Perform the synthesis process.
+
+        Args:
+            candidate_order (list[str]): The order of candidates to synthesize.
+
+        Returns:
+            list[str]: The synthesized invariants.
+        """
         steps = 0
         while True:
             steps += 1
@@ -234,7 +329,18 @@ class HoudiniSynthesizer:
         strategy: IISStrategy = SeqStrategy(),
         synconfig: HoudiniSynthesizerConfig = HoudiniSynthesizerConfig(),
     ) -> tuple[SpecModule, HoudiniSynthesizerStats]:
+        """Synthesize invariants for a specification module.
 
+        Args:
+            topmod (SpecModule): The top-level specification module.
+            des (Design): The design.
+            dc (DesignConfig): The design configuration.
+            strategy (IISStrategy, optional): The synthesis strategy.
+            synconfig (HoudiniSynthesizerConfig, optional): The synthesis configuration.
+
+        Returns:
+            tuple[SpecModule, HoudiniSynthesizerStats]: The synthesized module and statistics.
+        """
         logger.info(f"Using strategy: {strategy.__class__.__name__}")
         self.strategy: IISStrategy = strategy
         self.synconfig: HoudiniSynthesizerConfig = synconfig
@@ -298,12 +404,16 @@ class HoudiniSynthesizer:
 
 
 class HoudiniSynthesizerJG(HoudiniSynthesizer):
+    """Houdini synthesizer for JasperGold."""
+
     def __init__(self):
+        """Initialize the HoudiniSynthesizerJG."""
         super().__init__()
         self.jgc: JasperConfig = None
         self.svagen: SVAGen = None
 
     def _setup_synthesis(self):
+        """Set up the synthesis process for JasperGold."""
         assert isinstance(self.des, JGDesign), "Design not of type JGDesign."
         self.jgc: JasperConfig = self.des.pyc.jgc
         setup_jasper(self.specmodule, self.jgc, self.dc)
@@ -317,6 +427,7 @@ class HoudiniSynthesizerJG(HoudiniSynthesizer):
         self.ctx = " ".join([line.strip() for line in state_invs.split("\n")])
 
     def _restart_synthesis(self):
+        """Restart the synthesis process for JasperGold."""
         # Load the script
         loadscript(self.jgc.script)
         # Enable and disable the right assumptions
@@ -327,24 +438,55 @@ class HoudiniSynthesizerJG(HoudiniSynthesizer):
         self.minfuel = 0
 
     def _can_add(self, cand) -> bool:
+        """Check if a candidate can be added for JasperGold.
+
+        Args:
+            cand (str): The candidate to check.
+
+        Returns:
+            bool: True if the candidate can be added, False otherwise.
+        """
         return is_pass(prove(self.jgc.context, cand))
 
     def _enable_assm(self, cand):
+        """Enable an assumption for JasperGold.
+
+        Args:
+            cand (str): The assumption to enable.
+        """
         enable_assm(self.jgc.context, cand)
 
     def _disable_assm(self, cand):
+        """Disable an assumption for JasperGold.
+
+        Args:
+            cand (str): The assumption to disable.
+        """
         disable_assm(self.jgc.context, cand)
 
     def _check_safe(self) -> bool:
+        """Check if the current state is safe for JasperGold.
+
+        Returns:
+            bool: True if the state is safe, False otherwise.
+        """
         return is_pass(prove_out_induction_2t(self.jgc.context))
 
 
 class HoudiniSynthesizerBTOR(HoudiniSynthesizer):
+    """Houdini synthesizer for BTOR."""
+
     def __init__(self, gui=None):
+        """Initialize the HoudiniSynthesizerBTOR.
+
+        Args:
+            gui: Optional GUI interface.
+        """
         super().__init__()
         self.verifier = BTORVerifier2TraceIncremental(gui)
 
     def _setup_synthesis(self):
+        """Set up the synthesis process for BTOR."""
         assert isinstance(
             self.des, BTORDesign
         ), f"Design not of type BTORDesign, but is {type(self.des)}"
@@ -354,6 +496,7 @@ class HoudiniSynthesizerBTOR(HoudiniSynthesizer):
         }
 
     def _restart_synthesis(self):
+        """Restart the synthesis process for BTOR."""
         self.verifier = BTORVerifier2TraceIncremental()
         self.verifier.unroll(self.specmodule, self.des, self.dc)
 
@@ -362,23 +505,48 @@ class HoudiniSynthesizerBTOR(HoudiniSynthesizer):
         self.minfuel = 0
 
     def _can_add(self, cand):
+        """Check if a candidate can be added for BTOR.
+
+        Args:
+            cand (str): The candidate to check.
+
+        Returns:
+            bool: True if the candidate can be added, False otherwise.
+        """
         # Add clause to engine and check if there is a CEX
         return self.verifier.can_add(cand)
 
     def _disable_assm(self, assm):
+        """Disable an assumption for BTOR.
+
+        Args:
+            assm (str): The assumption to disable.
+        """
         # Remove clause from engine
         self.verifier.disable_hole_assm(assm)
 
     def _enable_assm(self, assm):
+        """Enable an assumption for BTOR.
+
+        Args:
+            assm (str): The assumption to enable.
+        """
         # Add clause to engine
         self.verifier.enable_hole_assm(assm)
 
     def _check_safe(self):
+        """Check if the current state is safe for BTOR.
+
+        Returns:
+            bool: True if the state is safe, False otherwise.
+        """
         # Check if there is a CEX
         return self.verifier.verify().verified
 
 
 class PERSynthesizer:
+    """PER synthesizer for invariant synthesis."""
+
     def __init__(
         self,
         pyconfig: PYConfig,
@@ -386,6 +554,14 @@ class PERSynthesizer:
         fuelbudget: int = 3,
         stepbudget: int = 10,
     ) -> None:
+        """Initialize the PERSynthesizer.
+
+        Args:
+            pyconfig (PYConfig): The PyCaliper configuration.
+            strategy (IISStrategy, optional): The synthesis strategy.
+            fuelbudget (int, optional): The fuel budget for synthesis.
+            stepbudget (int, optional): The step budget for synthesis.
+        """
         self.pyconfig = pyconfig
         self.svagen = None
         self.candidates: dict[str, PERHole] = {}
@@ -402,11 +578,13 @@ class PERSynthesizer:
         self.state_invs = ""
 
     def reset_state(self):
+        """Reset the synthesis state."""
         self.synstate = SynthesisTree()
         self.depth = 0
         self.minfuel = 0
 
     def _saturate(self):
+        """Saturate the current synthesis state."""
         added = True
         while added:
             added = False
@@ -422,6 +600,11 @@ class PERSynthesizer:
                         break
 
     def _dive(self, cand):
+        """Dive into a new synthesis state.
+
+        Args:
+            cand (str): The candidate to dive into.
+        """
         self.synstate.add_child(cand)
         self.synstate = self.synstate.children[cand]
         logger.debug(f"Dived to new state: {self.synstate} on candidate: {cand}")
@@ -437,6 +620,11 @@ class PERSynthesizer:
         )
 
     def _backtrack(self):
+        """Backtrack to the previous synthesis state.
+
+        Returns:
+            bool: True if backtracking was successful, False otherwise.
+        """
         if self.synstate.parent is not None:
             cand = self.synstate.inherits
             secondaries = self.synstate.secondaries
@@ -456,6 +644,11 @@ class PERSynthesizer:
             return False
 
     def safe(self):
+        """Check if the current synthesis state is safe.
+
+        Returns:
+            bool: True if the state is safe, False otherwise.
+        """
         if not self.synstate.checked:
             self.synstate.checked = True
             self.solvecalls += 1
@@ -463,6 +656,14 @@ class PERSynthesizer:
         return False
 
     def _synthesize(self, candidate_order):
+        """Perform the synthesis process.
+
+        Args:
+            candidate_order (list[str]): The order of candidates to synthesize.
+
+        Returns:
+            list[str]: The synthesized invariants.
+        """
         steps = 0
         while True:
             steps += 1
@@ -508,6 +709,15 @@ class PERSynthesizer:
                         return None
 
     def synthesize(self, topmod: SpecModule, retries: int = 1) -> SpecModule:
+        """Synthesize invariants for a specification module.
+
+        Args:
+            topmod (SpecModule): The top-level specification module.
+            retries (int, optional): The number of retries for synthesis.
+
+        Returns:
+            SpecModule: The synthesized module.
+        """
         # Create a new SVA generator
         assert topmod.is_instantiated(), "Module not instantiated."
 

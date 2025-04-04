@@ -1,3 +1,11 @@
+"""
+File: pycaliper/verif/refinementverifier.py
+This file is a part of the PyCaliper tool.
+See LICENSE.md for licensing information.
+
+Author: Adwait Godbole, UC Berkeley
+"""
+
 # SpecModule to module refinement verification
 
 import logging
@@ -17,27 +25,47 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class RefinementMap:
+    """Data class for refinement mappings."""
+
     mappings: list[tuple[PYCExpr, PYCExpr]]
 
 
 @dataclass
 class FunctionalRefinementMap(RefinementMap):
+    """Data class for functional refinement mappings."""
+
     mappings: list[tuple[Logic, PYCExpr]]
 
 
 class RefinementVerifier:
+    """Verifier for module-to-module and bounded simulation refinements."""
+
     def __init__(self, slv: BTORSolver = BoolectorSolver()):
+        """Initialize the RefinementVerifier.
+
+        Args:
+            slv (BTORSolver): The BTOR solver to use.
+        """
         self.slv = slv
         self.oplut = slv.oplut()
         # Variable map (dynamic and needs to be reset for each check)
         self.varmap = {}
 
     def reset(self):
+        """Reset the variable map."""
         self.varmap = {}
 
     def convert_expr_to_btor2(self, expr: PYCExpr, bindinst: str, step=0):
-        """Convert a PyCaliper expression to a BTOR2 expression"""
+        """Convert a PyCaliper expression to a BTOR2 expression.
 
+        Args:
+            expr (PYCExpr): The expression to convert.
+            bindinst (str): The binding instance.
+            step (int): The step index.
+
+        Returns:
+            BTOR2 expression.
+        """
         logger.debug("Converting expression %s", expr)
 
         if isinstance(expr, Logic):
@@ -96,6 +124,7 @@ class RefinementVerifier:
                 sys.exit(1)
 
     def dump_and_wait(self, assm):
+        """Dump the assumption and wait for user input."""
         assm.Dump()
         assm.Dump("smt2")
         input("\nPRESS ENTER TO CONTINUE")
@@ -103,13 +132,12 @@ class RefinementVerifier:
     def check_mm_refinement(
         self, mod1: SpecModule, mod2: SpecModule, rmap: RefinementMap
     ):
-        """
-        Check module-to-module refinement between two modules under a certain refinement map.
+        """Check module-to-module refinement between two modules under a certain refinement map.
 
         Args:
-            mod1: The first module
-            mod2: The second module
-            rmap: The refinement map
+            mod1 (SpecModule): The first module.
+            mod2 (SpecModule): The second module.
+            rmap (RefinementMap): The refinement map.
         """
         # Reset the global symbolic state
         self.reset()
@@ -155,7 +183,7 @@ class RefinementVerifier:
         # Refinement assumptions
         ref_assms_pre = []
         ref_assms_post = []
-        for (a_expr, b_expr) in rmap.mappings:
+        for a_expr, b_expr in rmap.mappings:
             ref_assms_pre.append(
                 self.convert_expr_to_btor2(a_expr, CPY1, 0)
                 == self.convert_expr_to_btor2(b_expr, CPY2, 0)
@@ -237,14 +265,13 @@ class RefinementVerifier:
     def check_ss_refinement(
         self, mod: SpecModule, bs1: str | Callable, bs2: str, flip_props: bool = False
     ):
-        """
-        Check bounded simulation refinement between two simulation schedules.
+        """Check bounded simulation refinement between two simulation schedules.
 
         Args:
-            mod: The module to check refinement for
-            bs1: The first simulation schedule
-            bs2: The second simulation schedule
-            flip_props: If True, turn assertions from the first schedule into assumptions
+            mod (SpecModule): The module to check refinement for.
+            bs1 (str | Callable): The first simulation schedule.
+            bs2 (str): The second simulation schedule.
+            flip_props (bool): If True, turn assertions from the first schedule into assumptions.
         """
         # Reset the global symbolic state
         self.reset()

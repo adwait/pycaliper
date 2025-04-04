@@ -1,3 +1,12 @@
+"""
+File: pycaliper/pycmanager.py
+
+This file manages the core functionalities of the PyCaliper tool.
+See LICENSE.md for licensing information.
+
+Author: Adwait Godbole, UC Berkeley
+"""
+
 import os
 import sys
 import logging

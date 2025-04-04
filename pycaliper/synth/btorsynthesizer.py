@@ -1,3 +1,11 @@
+"""
+File: pycaliper/synth/btorsynthesizer.py
+This file is a part of the PyCaliper tool.
+See LICENSE.md for licensing information.
+
+Author: Adwait Godbole, UC Berkeley
+"""
+
 import sys
 import logging
 
@@ -15,6 +23,11 @@ logger = logging.getLogger(__name__)
 
 class BTORVerifier2TraceIncremental(PYCBTORInterface):
     def __init__(self, gui=None) -> None:
+        """Initialize the BTORVerifier2TraceIncremental.
+
+        Args:
+            gui: Optional GUI interface.
+        """
         super().__init__(gui)
 
     def _setup_inductive_two_safety_syn(
@@ -24,7 +37,17 @@ class BTORVerifier2TraceIncremental(PYCBTORInterface):
         des: BTORDesign,
         dc: DesignConfig,
     ):
+        """Set up the inductive two-safety synthesis.
 
+        Args:
+            prog (list[prg.Instruction]): Program instructions.
+            specmodule (SpecModule): The specification module.
+            des (BTORDesign): The BTOR design.
+            dc (DesignConfig): The design configuration.
+
+        Returns:
+            tuple: Assumptions and assertions for synthesis.
+        """
         self.symex = BTOR2Ex(BoolectorSolver("btor2"), prog, self.gui)
         self.cpy1 = dc.cpy1
         self.cpy2 = dc.cpy2
@@ -82,13 +105,18 @@ class BTORVerifier2TraceIncremental(PYCBTORInterface):
         )
 
     def unroll(self, specmodule: SpecModule, des: BTORDesign, dc: DesignConfig):
-        """Synthesizer for inductive two-safety property
+        """Synthesizer for inductive two-safety property.
 
         Perform hole-synthesis for a single module w.r.t. the following property:
             input_eq && state_eq |-> ##1 output_eq && state_eq
 
+        Args:
+            specmodule (SpecModule): The specification module.
+            des (BTORDesign): The BTOR design.
+            dc (DesignConfig): The design configuration.
+
         Returns:
-            bool: synthesis result
+            bool: Synthesis result.
         """
         prog = des.prgm
         (
@@ -192,15 +220,30 @@ class BTORVerifier2TraceIncremental(PYCBTORInterface):
         self.assrt_exprs = tt_assrts
 
     def enable_hole_assm(self, hole_id: str):
-        """Enable a hole by adding its assumptions and assertions"""
+        """Enable a hole by adding its assumptions and assertions.
+
+        Args:
+            hole_id (str): The ID of the hole to enable.
+        """
         self.curr_assms.add(hole_id)
 
     def disable_hole_assm(self, hole_id: str):
-        """Disable a hole by removing its assumptions and assertions"""
+        """Disable a hole by removing its assumptions and assertions.
+
+        Args:
+            hole_id (str): The ID of the hole to disable.
+        """
         self.curr_assms.remove(hole_id)
 
     def can_add(self, hole_id: str) -> bool:
-        """Check if the hole can be added"""
+        """Check if the hole can be added.
+
+        Args:
+            hole_id (str): The ID of the hole to check.
+
+        Returns:
+            bool: True if the hole can be added, False otherwise.
+        """
         for assm in self.in_assms:
             # self.dump_and_wait(assm)
             self.symex.slv.mk_assume(assm)
@@ -227,7 +270,11 @@ class BTORVerifier2TraceIncremental(PYCBTORInterface):
         return not result
 
     def verify(self) -> BTORVerifResult:
-        """Check if the program is safe"""
+        """Check if the program is safe.
+
+        Returns:
+            BTORVerifResult: The verification result.
+        """
         for assrt_expr, assrt in zip(self.assrt_exprs, self.out_assrts):
             for assm in self.in_assms:
                 # self.dump_and_wait(assm)

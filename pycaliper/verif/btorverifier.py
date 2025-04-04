@@ -1,13 +1,13 @@
 """
-PyCaliper
+File: pycaliper/verif/btorverifier.py
+This file is a part of the PyCaliper tool.
+See LICENSE.md for licensing information.
 
 Author: Adwait Godbole, UC Berkeley
+"""
 
-File: verif/btorverifier.py
-
+"""
 This module provides classes for verifying BTOR designs using PyCaliper's verification framework.
-
-For licensing information, please refer to the LICENSE file.
 """
 
 import logging
@@ -25,7 +25,14 @@ logger = logging.getLogger(__name__)
 
 
 class BTORVerifier2Trace(PYCBTORInterface):
+    """Verifier for BTOR designs using two-trace induction."""
+
     def __init__(self, gui=None) -> None:
+        """Initialize the BTORVerifier2Trace.
+
+        Args:
+            gui: Optional GUI interface.
+        """
         super().__init__(gui)
 
     def _setup_inductive_two_safety(
@@ -35,7 +42,17 @@ class BTORVerifier2Trace(PYCBTORInterface):
         des: DesignConfig,
         dc: DesignConfig,
     ):
+        """Set up the inductive two-safety verification.
 
+        Args:
+            prog (list[prg.Instruction]): The program instructions.
+            specmodule (SpecModule): The specification module.
+            des (DesignConfig): The design configuration.
+            dc (DesignConfig): The design configuration.
+
+        Returns:
+            tuple: Assumptions and assertions for verification.
+        """
         self.symex = BTOR2Ex(BoolectorSolver("btor2"), prog, self.gui)
         self.cpy1 = dc.cpy1
         self.cpy2 = dc.cpy2
@@ -96,12 +113,16 @@ class BTORVerifier2Trace(PYCBTORInterface):
         des: BTORDesign,
         dc: DesignConfig,
     ) -> BTORVerifResult:
-        """
-        Perform verification for a single module of the following property:
+        """Perform verification for a single module of the following property:
             input_eq && state_eq |-> ##1 output_eq && state_eq
 
+        Args:
+            specmodule (SpecModule): The specification module.
+            des (BTORDesign): The BTOR design.
+            dc (DesignConfig): The design configuration.
+
         Returns:
-            bool: is SAFE?
+            BTORVerifResult: The verification result.
         """
         prog = des.prgm
         (
@@ -206,7 +227,14 @@ class BTORVerifier2Trace(PYCBTORInterface):
 
 
 class BTORVerifier1Trace(PYCBTORInterface):
+    """Verifier for BTOR designs using one-trace induction."""
+
     def __init__(self, gui=None):
+        """Initialize the BTORVerifier1Trace.
+
+        Args:
+            gui: Optional GUI interface.
+        """
         super().__init__(gui)
 
     def _setup_inductive_one_safety(
@@ -216,6 +244,17 @@ class BTORVerifier1Trace(PYCBTORInterface):
         des: BTORDesign,
         dc: DesignConfig,
     ):
+        """Set up the inductive one-safety verification.
+
+        Args:
+            prog (list[prg.Instruction]): The program instructions.
+            specmodule (SpecModule): The specification module.
+            des (BTORDesign): The BTOR design.
+            dc (DesignConfig): The design configuration.
+
+        Returns:
+            tuple: Assumptions and assertions for verification.
+        """
         self.symex = BTOR2Ex(BoolectorSolver("btor2"), prog, self.gui)
         self.cpy1 = dc.cpy1
         self.cpy2 = dc.cpy2
@@ -252,12 +291,16 @@ class BTORVerifier1Trace(PYCBTORInterface):
         des: BTORDesign,
         dc: DesignConfig,
     ) -> BTORVerifResult:
-        """
-        Perform verification for a single module of the following property:
+        """Perform verification for a single module of the following property:
             input_eq && state_eq |-> ##1 output_eq && state_eq
 
+        Args:
+            specmodule (SpecModule): The specification module.
+            des (BTORDesign): The BTOR design.
+            dc (DesignConfig): The design configuration.
+
         Returns:
-            bool: is SAFE?
+            BTORVerifResult: The verification result.
         """
         prog = des.prgm
         (

@@ -1,3 +1,11 @@
+"""
+File: pycaliper/verif/jgverifier.py
+This file is a part of the PyCaliper tool.
+See LICENSE.md for licensing information.
+
+Author: Adwait Godbole, UC Berkeley
+"""
+
 import logging
 
 from ..pycconfig import PYConfig, Design
@@ -23,21 +31,22 @@ logger = logging.getLogger(__name__)
 
 
 class JGVerifier1Trace:
-    """One trace property verifier"""
+    """One trace property verifier."""
 
     def __init__(self) -> None:
+        """Initialize the JGVerifier1Trace."""
         pass
 
     def verify(self, specmodule: SpecModule, pyconfig: PYConfig) -> bool:
-        """Verify one trace properties for the given module
+        """Verify one trace properties for the given module.
 
         Args:
-            specmodule (SpecModule): SpecModule to verify
+            specmodule (SpecModule): SpecModule to verify.
+            pyconfig (PYConfig): PyCaliper configuration.
 
         Returns:
-            bool: True if the module is safe, False otherwise
+            bool: True if the module is safe, False otherwise.
         """
-
         setup_jasper(specmodule, pyconfig.jgc, pyconfig.dc)
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
@@ -59,19 +68,21 @@ class JGVerifier1Trace:
 
 
 class JGVerifier2Trace:
-    """Two trace property verifier"""
+    """Two trace property verifier."""
 
     def __init__(self) -> None:
+        """Initialize the JGVerifier2Trace."""
         pass
 
-    def verify(self, specmodule, pyconfig: PYConfig) -> bool:
-        """Verify two trace properties for the given module
+    def verify(self, specmodule: SpecModule, pyconfig: PYConfig) -> bool:
+        """Verify two trace properties for the given module.
 
         Args:
-            specmodule (SpecModule): SpecModule to verify
+            specmodule (SpecModule): SpecModule to verify.
+            pyconfig (PYConfig): PyCaliper configuration.
 
         Returns:
-            bool: True if the module is safe, False otherwise
+            bool: True if the module is safe, False otherwise.
         """
         setup_jasper(specmodule, pyconfig.jgc, pyconfig.dc)
         svageni = svagen.SVAGen()
@@ -90,22 +101,23 @@ class JGVerifier2Trace:
 
 
 class JGVerifier1TraceBMC:
-    """One trace property verifier with BMC"""
+    """One trace property verifier with BMC."""
 
     def __init__(self) -> None:
+        """Initialize the JGVerifier1TraceBMC."""
         pass
 
     def verify(self, specmodule: SpecModule, pyconfig: PYConfig, schedule: str):
-        """Verify one trace properties for the given module
+        """Verify one trace properties for the given module.
 
         Args:
-            specmodule (SpecModule): SpecModule to verify
-            schedule (str): Simulation constraints
+            specmodule (SpecModule): SpecModule to verify.
+            pyconfig (PYConfig): PyCaliper configuration.
+            schedule (str): Simulation constraints.
 
         Returns:
-            bool: True if the module is safe, False otherwise
+            bool: True if the module is safe, False otherwise.
         """
-
         setup_jasper(specmodule, pyconfig.jgc, pyconfig.dc)
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(

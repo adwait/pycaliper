@@ -1,3 +1,12 @@
+"""
+File: pycaliper/pycgui.py
+
+This file is a part of the PyCaliper tool.
+See LICENSE.md for licensing information.
+
+Author: Adwait Godbole, UC Berkeley
+"""
+
 import logging
 import threading
 from flask import Flask, render_template

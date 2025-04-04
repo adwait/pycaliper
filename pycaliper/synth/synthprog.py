@@ -1,35 +1,52 @@
+"""
+File: pycaliper/synth/synthprog.py
+See LICENSE.md for licensing information.
+
+Author: Adwait Godbole, UC Berkeley
+"""
+
 import logging
 
 from pysmt.shortcuts import Symbol, Implies, Equals, NotEquals, Not, And, Or, BV, Solver
 from pysmt.typing import BVType, BOOL
 
-
 from .. import per as p
-
 
 logger = logging.getLogger(__name__)
 
 
 class LUTSynthProgram:
+    """Base class for LUT synthesis programs."""
+
     def __init__(self):
+        """Initialize the LUTSynthProgram."""
         pass
 
     def add_values(self):
+        """Add values to the synthesis program."""
         pass
 
     def solve(self):
+        """Solve the synthesis program."""
         pass
 
     def get_inv(self):
+        """Get the invariant from the synthesis program."""
         pass
 
 
 class ZDDLUTSynthProgram:
+    """ZDD-based LUT synthesis program."""
 
     MAX_DEPTH = 10
 
     def __init__(self, ctr: p.Logic, out: p.Logic):
+        """Initialize the ZDDLUTSynthProgram.
 
+        Args:
+            ctr (p.Logic): The control logic.
+            out (p.Logic): The output logic.
+        """
         self.ctr = ctr
         self.out = out
         self.ctr_width = ctr.width
@@ -47,6 +64,7 @@ class ZDDLUTSynthProgram:
         self.solution = None
 
     def _increment_depth(self):
+        """Increment the depth of the synthesis program."""
         self.depth += 1
         new_vs = Symbol(f"val_{self.depth}", BVType(self.ctr_width))
         self.val_symbs.append(new_vs)
@@ -65,6 +83,12 @@ class ZDDLUTSynthProgram:
             self.cons[self.depth].append((cv, ov, And(taken, nottaken)))
 
     def _add_entry(self, ctr_value, out_value):
+        """Add an entry to the synthesis program.
+
+        Args:
+            ctr_value: The control value.
+            out_value: The output value.
+        """
         ctr_val_bv = BV(ctr_value, self.ctr_width)
         out_val_bv = BV(out_value, self.out_width)
 
@@ -91,13 +115,32 @@ class ZDDLUTSynthProgram:
         add_entry_helper(self.depth)
 
     def add_entries(self, ctr_vals: list[int], out_vals: list[int]):
+        """Add multiple entries to the synthesis program.
+
+        Args:
+            ctr_vals (list[int]): The control values.
+            out_vals (list[int]): The output values.
+        """
         for c, o in zip(ctr_vals, out_vals):
             self._add_entry(c, o)
 
     def get_cons(self):
+        """Get the constraints of the synthesis program.
+
+        Returns:
+            dict[int, list]: The constraints.
+        """
         return self.cons
 
     def _generate_inv(self, d, nd, v_vals: list, o_vals: list):
+        """Generate the invariant for the synthesis program.
+
+        Args:
+            d: The depth.
+            nd: The number of nondeterministic choices.
+            v_vals (list): The control values.
+            o_vals (list): The output values.
+        """
         v_vals.reverse()
         o_vals.reverse()
 
@@ -126,7 +169,15 @@ class ZDDLUTSynthProgram:
         self.solution = inv
 
     def _solve_nondet(self, d, nd=0):
+        """Solve the synthesis program with nondeterministic choices.
 
+        Args:
+            d: The depth.
+            nd: The number of nondeterministic choices.
+
+        Returns:
+            bool: True if a solution was found, False otherwise.
+        """
         solver = Solver(logic="QF_BV")
 
         constraints = [c[2] for c in self.cons[d]]
@@ -154,7 +205,14 @@ class ZDDLUTSynthProgram:
         return False
 
     def solve(self, depth=MAX_DEPTH):
+        """Solve the synthesis program.
 
+        Args:
+            depth: The maximum depth to solve.
+
+        Returns:
+            bool: True if a solution was found, False otherwise.
+        """
         # Try as is, without incrementing
         for d in range(1, depth):
             # If we have not reached the depth, increment
@@ -167,4 +225,9 @@ class ZDDLUTSynthProgram:
         return False
 
     def get_inv(self):
+        """Get the invariant from the synthesis program.
+
+        Returns:
+            p.Expr: The invariant.
+        """
         return self.solution

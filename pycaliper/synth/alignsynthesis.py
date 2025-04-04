@@ -1,3 +1,10 @@
+"""
+File: pycaliper/synth/alignsynthesis.py
+See LICENSE.md for licensing information.
+
+Author: Adwait Godbole, UC Berkeley
+"""
+
 import logging
 import sys
 from vcdvcd import VCDVCD
@@ -16,13 +23,18 @@ logger = logging.getLogger(__name__)
 
 class AlignSynthesizer:
     def __init__(self, tmgr: PYCManager) -> None:
+        """Initialize the AlignSynthesizer with a PYCManager.
+
+        Args:
+            tmgr (PYCManager): The PyCaliper manager for handling tasks.
+        """
         self.tmgr = tmgr
 
     def _sample_tracepath(self) -> str:
-        """Generate a simulation VCD trace from the design
+        """Generate a simulation VCD trace from the design.
 
         Returns:
-            str: path to the generated VCD trace
+            str: Path to the generated VCD trace.
         """
         vcd_path = self.tmgr.get_vcd_path_random()
         if vcd_path is None:
@@ -31,14 +43,17 @@ class AlignSynthesizer:
         return vcd_path
 
     def _inspect_module(self, specmodule: SpecModule) -> bool:
-        """Inspect the module for well-formedness
+        """Inspect the module for well-formedness.
 
         Checks whether:
             (a) all signals in holes are single bit logic signals and
             (b) no two holes have common signals.
 
+        Args:
+            specmodule (SpecModule): The specification module to inspect.
+
         Returns:
-            bool: True if module is well-formed, False otherwise
+            bool: True if module is well-formed, False otherwise.
         """
         caholes = specmodule._pycinternal__caholes
         holesigs = [set(h.sigs) for h in caholes]
@@ -62,6 +77,13 @@ class AlignSynthesizer:
     def _synthesize_cahole(
         self, specmodule: SpecModule, cahole: CtrAlignHole, dc: DesignConfig
     ):
+        """Attempt synthesis for a control alignment hole.
+
+        Args:
+            specmodule (SpecModule): The specification module containing the hole.
+            cahole (CtrAlignHole): The control alignment hole to synthesize.
+            dc (DesignConfig): The design configuration.
+        """
         logger.debug(f"Attempting synthesis for hole {cahole}")
 
         vcdfile = self._sample_tracepath()
@@ -105,7 +127,15 @@ class AlignSynthesizer:
                 logger.info(f"No solution found for hole {cahole}.")
 
     def synthesize(self, specmodule: SpecModule, dc: DesignConfig) -> SpecModule:
+        """Synthesize control alignment holes in the specification module.
 
+        Args:
+            specmodule (SpecModule): The specification module to synthesize.
+            dc (DesignConfig): The design configuration.
+
+        Returns:
+            SpecModule: The synthesized specification module.
+        """
         if not self._inspect_module(specmodule):
             logger.error(
                 "SpecModule holes are not well-formed for AlignSynth, please check log. Exiting."
