@@ -18,8 +18,8 @@ PyCaliper has been developed and tested with Python 3.11. We recommend using a [
 0. Clone this repository and the `btor2ex` package that provides a symbolic simulator for `btor2`.
 
 ```bash
-git clone https://github.com/adwait/pycaliper.git
-git clone https://github.com/adwait/btor2ex.git
+git clone https://github.com/pycaliper/pycaliper.git
+git clone https://github.com/pycaliper/btor2ex.git
 ```
 
 1. Install all Python packages using the `requirements.txt`, making sure to use the virtual environment. For example, using `pip`:
@@ -49,8 +49,8 @@ python3 -m tests.test
 1. Clone this repository and the `btor2ex` package as above:
 
 ```bash
-git clone https://github.com/adwait/pycaliper.git
-git clone https://github.com/adwait/btor2ex.git
+git clone https://github.com/pycaliper/pycaliper.git
+git clone https://github.com/pycaliper/btor2ex.git
 ```
 
 2. Install both packages using the `pyproject.toml`, making sure to use the virtual environment. For example, using `pip`:
@@ -120,4 +120,4 @@ Please also run the provided tests and add further tests targetting newly contri
 
 ## Feedback
 
-We encourage feedback and suggestions via [GitHub Issues](https://github.com/adwait/pycaliper/issues).
+We encourage feedback and suggestions via [GitHub Issues](https://github.com/pycaliper/pycaliper/issues).

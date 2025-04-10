@@ -16,8 +16,8 @@ First, clone the PyCaliper and btor2ex repositories from GitHub. Open your termi
 
 .. code-block:: bash
 
-   git clone https://github.com/adwait/pycaliper.git
-   git clone https://github.com/adwait/btor2ex.git
+   git clone https://github.com/pycaliper/pycaliper.git
+   git clone https://github.com/pycaliper/btor2ex.git
 
 Now either perform a quick setup (Step 2a) or build the package (Step 2b).
 
