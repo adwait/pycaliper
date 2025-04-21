@@ -22,6 +22,7 @@ from .per import (
     AuxModule,
     AuxReg,
     unroll,
+    seqprop,
     kinduct,
     rose,
     fell,

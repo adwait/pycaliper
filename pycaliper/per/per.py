@@ -673,6 +673,7 @@ class Context(Enum):
     STATE = 1
     OUTPUT = 2
     UNROLL = 3
+    SEQPROP = 4
 
 
 class Hole:
@@ -792,6 +793,28 @@ class SimulationSchedule:
         return self._pycinternal__steps
 
 
+class SeqPropSchedule:
+    def __init__(self, name: str, depth: int):
+        self.name = name
+        self.depth = depth
+        self._pycinternal__steps: list[SimulationStep] = []
+
+    def step(self, step: SimulationStep):
+        self._pycinternal__steps.append(copy.deepcopy(step))
+
+    def __repr__(self) -> str:
+        fnstrs = [f"\t@seqprop({self.depth})", f"\tdef {self.name}(self, i: int):"]
+        for i, step in enumerate(self._pycinternal__steps):
+            fnstrs.append(f"\t\t# Step {i}")
+            fnstrs.append(f"\t\tif i == {i}:")
+            fnstrs.append(indent(repr(step), "\t"))
+        return "\n".join(fnstrs)
+
+    @property
+    def steps(self):
+        return self._pycinternal__steps
+
+
 def kinduct(b: int):
     """Decorator to set the k-induction depth for a state invariant specification."""
 
@@ -820,6 +843,22 @@ def unroll(b: int):
         return wrapper
 
     return unroll_decorator
+
+
+def seqprop(b: int):
+    """Decorator to set the sequential property depth for a function in a SpecModule."""
+
+    def seqprop_decorator(func):
+        @wraps(func)
+        def wrapper(self: SpecModule, i: int):
+            func(self, i)
+
+        wrapper._pycinternal__is_seqprop_schedule = True
+        wrapper._pycinternal__seqprop_depth = b
+
+        return wrapper
+
+    return seqprop_decorator
 
 
 class SpecModule:
@@ -863,6 +902,7 @@ class SpecModule:
         self._pycinternal__output_invs: list[Inv] = []
         # Non-invariant properties: mapping from caller function name to a symbolic schedule
         self._pycinternal__simsteps: dict[str, SimulationSchedule] = {}
+        self._pycinternal__seqprops: dict[str, SeqPropSchedule] = {}
 
         # PER holes
         self._pycinternal__perholes: list[PERHole] = []
@@ -1233,6 +1273,30 @@ class SpecModule:
                     )
                     continue
 
+            # Handle all seqprops schedules
+            elif hasattr(fn, "_pycinternal__is_seqprop_schedule"):
+                if hasattr(fn, "_pycinternal__seqprop_depth"):
+                    logger.debug(
+                        "Sequential property schedule %s with depth %d",
+                        fn.__name__,
+                        fn._pycinternal__seqprop_depth,
+                    )
+                    # Unroll this schedule
+                    fn_name = fn.__name__
+                    fn_unroll_depth = fn._pycinternal__seqprop_depth
+                    # Create a new simulation schedule
+                    simschedule = SeqPropSchedule(fn_name, fn_unroll_depth)
+                    for j in range(fn_unroll_depth):
+                        self._pycinternal__simstep = SimulationStep()
+                        fn(j)
+                        simschedule.step(self._pycinternal__simstep)
+                    self._pycinternal__seqprops[fn_name] = simschedule
+                else:
+                    logger.error(
+                        "Sequential property schedule must have a depth specified, skipping"
+                    )
+                    continue
+
         self._pycinternal__instantiated = True
         return self
 
@@ -1247,7 +1311,14 @@ class SpecModule:
             sys.exit(1)
         # return maximum counter length between kind and unroll schedules
         kd = self._pycinternal__kind_depth
-        return (kd, max([kd] + [v.depth for v in self._pycinternal__simsteps.values()]))
+        return (
+            kd,
+            max(
+                [kd]
+                + [v.depth for v in self._pycinternal__simsteps.values()]
+                + [v.depth for v in self._pycinternal__seqprops.values()]
+            ),
+        )
 
     def get_hier_path(self, sep: str = "."):
         """Call inner get_hier_path method."""
@@ -1372,6 +1443,10 @@ class SpecModule:
             [repr(v) for _, v in self._pycinternal__simsteps.items()]
         )
 
+        seqprops = "\n\n".join(
+            [repr(v) for _, v in self._pycinternal__seqprops.items()]
+        )
+
         return f"""
 
 class {self.__class__.__name__}(SpecModule):
@@ -1385,6 +1460,8 @@ class {self.__class__.__name__}(SpecModule):
 {statestring}
 
 {simsteps}
+
+{seqprops}
         """
 
     def pprint(self):

@@ -4,7 +4,7 @@ import os
 
 from . import jasperclient as jgc
 from ..svagen import SVAContext
-from ..propns import TOP_STEP_PROP
+from ..propns import TOP_STEP_PROP, TOP_SEQ_PROP
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +163,10 @@ def prove_out_bmc(taskcon, svacon: SVAContext, sched: str) -> list[ProofResult]:
     for i in range(len(svacon.asrts_bmc[sched])):
         results.append(prove(taskcon, TOP_STEP_PROP(sched, i)))
     return results
+
+
+def prove_seq(taskcon, svacon: SVAContext, sched: str) -> ProofResult:
+    return prove(taskcon, TOP_SEQ_PROP(sched))
 
 
 def loadscript(script):
