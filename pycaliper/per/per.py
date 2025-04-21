@@ -878,6 +878,7 @@ class SpecModule:
         self._pycinternal__prev_signals = {}
         # Clock signal
         self._pycinternal__clk: Clock | None = None
+        self._pycinternal__kind_depth = 1
 
     # Invariant functions to be overloaded by descendant specification classes
     def input(self) -> None:
@@ -1309,7 +1310,7 @@ class SpecModule:
             f"\t\tsuper().__init__(name, kwargs)",
         ]
         inits.append(
-            f"\t\tself.{nonreserved_or_fresh(self._pycinternal__clk.name)} = Clock({self._pycinternal__clk.name})"
+            f'\t\tself.{nonreserved_or_fresh(self._pycinternal__clk.name)} = Clock("{self._pycinternal__clk.name}")'
         )
         for s, t in self._pycinternal__signals.items():
             if isinstance(t, AuxReg):
@@ -1359,7 +1360,7 @@ class SpecModule:
         outputstring = "\n".join(outputs)
 
         states = (
-            [f"\t@kind({self._pycinternal__kind_depth})\n\tdef state(self):"]
+            [f"\t@kinduct({self._pycinternal__kind_depth})\n\tdef state(self):"]
             + [f"\t\t{repr(t)}" for t in self._pycinternal__state_tt]
             + [f"\t\t{repr(t)}" for t in self._pycinternal__state_invs]
             + [f"\t\t{repr(t)}" for t in self._pycinternal__perholes if t.active]

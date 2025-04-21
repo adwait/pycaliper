@@ -275,7 +275,7 @@ class ProofManager:
             design, JGDesign
         ), "Design must be a JGDesign for Jasper verification."
 
-        mock_or_connect(design.pyc)
+        mock_or_connect(design.pyc.mock, design.pyc.jgc.port)
         verifier = JGVerifier1TraceBMC()
 
         res = verifier.verify(spec, design.pyc, sched_name)

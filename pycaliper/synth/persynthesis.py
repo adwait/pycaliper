@@ -416,7 +416,7 @@ class HoudiniSynthesizerJG(HoudiniSynthesizer):
         """Set up the synthesis process for JasperGold."""
         assert isinstance(self.des, JGDesign), "Design not of type JGDesign."
         self.jgc: JasperConfig = self.des.pyc.jgc
-        setup_jasper(self.specmodule, self.jgc, self.dc)
+        setup_jasper(self.jgc, self.dc, self.specmodule)
         self.svagen = SVAGen()
         self.svagen.create_pyc_specfile(
             self.specmodule, filename=self.jgc.pycfile_abspath(), dc=self.dc
@@ -721,7 +721,7 @@ class PERSynthesizer:
         # Create a new SVA generator
         assert topmod.is_instantiated(), "Module not instantiated."
 
-        setup_jasper(topmod, self.pyconfig.jgc, self.pyconfig.dc)
+        setup_jasper(self.pyconfig.jgc, self.pyconfig.dc, topmod)
         self.svagen = SVAGen()
         self.svagen.create_pyc_specfile(
             topmod, filename=self.pyconfig.jgc.pycfile_abspath(), dc=self.pyconfig.dc

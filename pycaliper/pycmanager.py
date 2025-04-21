@@ -42,6 +42,8 @@ class PYCTask(Enum):
     CTRLSYNTH = 4  #: Control synthesis
     PERSYNTH = 5  #: PER synthesis
     FULLSYNTH = 6  #: Full synthesis
+    EXPLORE = 7  #: Design hierarchy exploration
+    JGHARNESS = 8  #: Jasper harness generation
 
 
 class PYCArgs(BaseModel):
@@ -313,21 +315,65 @@ def create_module(specpath, args):
         sys.path.remove(module_path)
 
 
-def mock_or_connect(pyconfig: PYConfig) -> bool:
+def mock_or_connect(mock: bool, port: int) -> bool:
     """Connect to Jasper or run in mock mode.
 
     Args:
-        pyconfig (PYConfig): PyCaliper configuration.
+        mock (bool): True if running in mock mode, False if connected to Jasper.
+        port (int): Port number to connect to Jasper.
 
     Returns:
         bool: True if connected to Jasper, False if running in mock mode.
     """
-    if pyconfig.mock:
+    if mock:
         logger.info("Running in mock mode.")
         return False
     else:
-        jgc.connect_tcp("localhost", pyconfig.jgc.port)
+        jgc.connect_tcp("localhost", port)
         return True
+
+
+def get_jgconfig(jgcpath: str) -> JasperConfig:
+    # Create a Jasper configuration
+    with open(jgcpath, "r") as f:
+        jgconfig = json.load(f)
+    # And validate it
+    try:
+        validate(instance=jgconfig, schema=JG_CONFIG_SCHEMA)
+    except ValidationError as e:
+        logger.error(f"Jasper config schema validation failed: {e.message}")
+        logger.error(
+            f"Please check schema:\n{json.dumps(JG_CONFIG_SCHEMA, indent=4, sort_keys=True, separators=(',', ': '))}"
+        )
+        sys.exit(1)
+    return JasperConfig(
+        jdir=jgconfig["jasper"]["jdir"],
+        script=jgconfig["jasper"]["script"],
+        pycfile=jgconfig["jasper"]["pycfile"],
+        context=jgconfig["jasper"]["context"],
+        design_list=jgconfig["jasper"].get("design_list", "design.lst"),
+        port=jgconfig["jasper"].get("port", 8080),
+    )
+
+
+def get_designconfig(dcpath: str) -> DesignConfig:
+    with open(dcpath, "r") as f:
+        dconfig = json.load(f)
+    try:
+        validate(instance=dconfig, schema=D_CONFIG_SCHEMA)
+    except ValidationError as e:
+        logger.error(f"Design config schema validation failed: {e.message}")
+        logger.error(
+            f"Please check schema:\n{json.dumps(D_CONFIG_SCHEMA, indent=4, sort_keys=True, separators=(',', ': '))}"
+        )
+        sys.exit(1)
+    return DesignConfig(
+        cpy1=dconfig["cpy1"],
+        cpy2=dconfig.get("cpy2", "b"),
+        lang=dconfig.get("lang", "sv12"),
+        topmod=dconfig["topmod"],
+        clk=dconfig.get("clk", "clk"),
+    )
 
 
 def get_pyconfig(args: PYCArgs) -> PYConfig:
@@ -344,47 +390,12 @@ def get_pyconfig(args: PYCArgs) -> PYConfig:
     """
 
     if args.jgcpath != "":
-        # Create a Jasper configuration
-        with open(args.jgcpath, "r") as f:
-            jgconfig = json.load(f)
-        # And validate it
-        try:
-            validate(instance=jgconfig, schema=JG_CONFIG_SCHEMA)
-        except ValidationError as e:
-            logger.error(f"Jasper config schema validation failed: {e.message}")
-            logger.error(
-                f"Please check schema:\n{json.dumps(JG_CONFIG_SCHEMA, indent=4, sort_keys=True, separators=(',', ': '))}"
-            )
-            sys.exit(1)
-        jasperc = JasperConfig(
-            jdir=jgconfig["jasper"]["jdir"],
-            script=jgconfig["jasper"]["script"],
-            pycfile=jgconfig["jasper"]["pycfile"],
-            context=jgconfig["jasper"]["context"],
-            design_list=jgconfig["jasper"].get("design_list", "design.lst"),
-            port=jgconfig["jasper"].get("port", 8080),
-        )
+        jasperc = get_jgconfig(args.jgcpath)
     else:
         jasperc = JasperConfig()
 
     if args.dcpath != "":
-        with open(args.dcpath, "r") as f:
-            dconfig = json.load(f)
-        try:
-            validate(instance=dconfig, schema=D_CONFIG_SCHEMA)
-        except ValidationError as e:
-            logger.error(f"Design config schema validation failed: {e.message}")
-            logger.error(
-                f"Please check schema:\n{json.dumps(D_CONFIG_SCHEMA, indent=4, sort_keys=True, separators=(',', ': '))}"
-            )
-            sys.exit(1)
-        designc = DesignConfig(
-            cpy1=dconfig["cpy1"],
-            cpy2=dconfig.get("cpy2", "b"),
-            lang=dconfig.get("lang", "sv12"),
-            topmod=dconfig["topmod"],
-            clk=dconfig.get("clk", "clk"),
-        )
+        designc = get_designconfig(args.dcpath)
     else:
         designc = DesignConfig()
 
@@ -417,7 +428,7 @@ def setup_all(args: PYCArgs) -> tuple[bool, PYConfig, PYCManager]:
     """
     pyconfig = get_pyconfig(args)
     tmgr = PYCManager(pyconfig)
-    is_connected = mock_or_connect(pyconfig)
+    is_connected = mock_or_connect(pyconfig.mock, pyconfig.jgc.port)
 
     return is_connected, pyconfig, tmgr
 

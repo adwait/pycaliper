@@ -17,7 +17,7 @@ def _create_tcl_script(
     lang: str = "sv12",
     design_lst_file: str = "design.lst",
     harnessmod: str = "miter",
-    max_trace_len: int = 3,
+    max_trace_len: int = None,
 ) -> str:
     return f"""clear -all
 
@@ -81,22 +81,20 @@ reset_formal
 # Set default Jasper proof engines (overrides use_nb engine settings)
 set_engine_mode {{Ht}}
 
-set_max_trace_length {max_trace_len}
+""" + (
+        f"set_max_trace_length {max_trace_len}" if max_trace_len is not None else ""
+    )
 
-"""
 
-
-def _create_design_instance(mod: SpecModule, dc: DesignConfig, inst_name: str) -> str:
+def _create_design_instance(dc: DesignConfig, inst_name: str) -> str:
     return f"""
 {dc.topmod} {inst_name} (
-    .{mod.get_clk().name}({HARNESS_CLK})
+    .{dc.clk}({HARNESS_CLK})
 );
 """
 
 
-def _create_proof_harness_miter(
-    mod: SpecModule, pycfile: str, harnessmod: str, dc: DesignConfig
-) -> str:
+def _create_proof_harness_miter(pycfile: str, harnessmod: str, dc: DesignConfig) -> str:
     return f"""
 // Parent module with a miter with different inputs
 module {harnessmod} (
@@ -104,9 +102,9 @@ module {harnessmod} (
     , input wire {HARNESS_RST}
 );
 
-    {_create_design_instance(mod, dc, dc.cpy1)}
+    {_create_design_instance(dc, dc.cpy1)}
 
-    {_create_design_instance(mod, dc, dc.cpy2)}
+    {_create_design_instance(dc, dc.cpy2)}
 
 
     default clocking cb @(posedge {HARNESS_CLK});
@@ -121,7 +119,7 @@ endmodule
 
 
 def _create_proof_harness_single(
-    mod: SpecModule, pycfile: str, harnessmod: str, dc: DesignConfig
+    pycfile: str, harnessmod: str, dc: DesignConfig
 ) -> str:
     return f"""
 // Parent module with a single design
@@ -130,7 +128,7 @@ module {harnessmod} (
     , input wire {HARNESS_RST}
 );
 
-    {_create_design_instance(mod, dc, dc.cpy1)}
+    {_create_design_instance(dc, dc.cpy1)}
 
 
     default clocking cb @(posedge {HARNESS_CLK});
@@ -144,7 +142,7 @@ endmodule
 """
 
 
-def setup_jasper(mod: SpecModule, jgc: JasperConfig, dc: DesignConfig) -> bool:
+def setup_jasper(jgc: JasperConfig, dc: DesignConfig, mod: SpecModule = None) -> bool:
 
     setjwd(jgc.jdir)
     if dc.topmod == "":
@@ -185,7 +183,9 @@ def setup_jasper(mod: SpecModule, jgc: JasperConfig, dc: DesignConfig) -> bool:
                 design_lst_file=jgc.design_list,
                 harnessmod=harnessmod,
                 lang=dc.lang,
-                max_trace_len=mod.get_unroll_kind_depths()[1],
+                max_trace_len=(
+                    None if mod is None else mod.get_unroll_kind_depths()[1]
+                ),
             )
         )
 
@@ -193,10 +193,14 @@ def setup_jasper(mod: SpecModule, jgc: JasperConfig, dc: DesignConfig) -> bool:
     harnessfile = (jgdir / f"{harnessmod}.sv").resolve()
     # Create the harness module
     if dc.cpy2 != "":
-        harness = _create_proof_harness_miter(mod, jgc.pycfile, harnessmod, dc)
+        harness = _create_proof_harness_miter(jgc.pycfile, harnessmod, dc)
     else:
-        harness = _create_proof_harness_single(mod, jgc.pycfile, harnessmod, dc)
+        harness = _create_proof_harness_single(jgc.pycfile, harnessmod, dc)
     with open(harnessfile, "w") as f:
         f.write(harness)
+
+    # Create empty pycfile
+    with open(jgc.pycfile, "w") as f:
+        f.write(f"// PyCaliper generated file for {dc.topmod}\n")
 
     return True
