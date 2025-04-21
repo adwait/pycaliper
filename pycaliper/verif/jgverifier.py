@@ -16,6 +16,7 @@ from ..jginterface.jgoracle import (
     prove_out_induction_1t,
     prove_out_induction_2t,
     prove_out_bmc,
+    prove_seq,
     loadscript,
     is_pass,
     set_assm_induction_1t,
@@ -143,3 +144,40 @@ class JGVerifier1TraceBMC:
         )
         logger.info("One trace verification result:\n\t%s", results_str)
         return results
+
+
+class JGVerifier1TraceInvariant:
+    """One trace invariant verifier with BMC."""
+
+    def __init__(self) -> None:
+        """Initialize the JGVerifier1TraceBMC."""
+        pass
+
+    def verify(self, specmodule: SpecModule, pyconfig: PYConfig, schedule: str):
+        """Verify one trace properties for the given module.
+
+        Args:
+            specmodule (SpecModule): SpecModule to verify.
+            pyconfig (PYConfig): PyCaliper configuration.
+            schedule (str): Sequence constraints.
+
+        Returns:
+            bool: True if the module is safe, False otherwise.
+        """
+        setup_jasper(pyconfig.jgc, pyconfig.dc, specmodule)
+        svageni = svagen.SVAGen()
+        svageni.create_pyc_specfile(
+            specmodule, filename=pyconfig.jgc.pycfile_abspath(), dc=pyconfig.dc
+        )
+        self.candidates = svageni.holes
+
+        loadscript(pyconfig.jgc.script)
+        # # Enable the assumptions for 1 trace verification
+        # set_assm_bmc(pyconfig.jgc.context, svageni.property_context, schedule)
+
+        res = is_pass(
+            prove_seq(pyconfig.jgc.context, svageni.property_context, schedule)
+        )
+        results_str = f"SAFE" if res else f"UNSAFE"
+        logger.info("One trace verification result:\n\t%s", results_str)
+        return res
