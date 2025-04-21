@@ -17,10 +17,16 @@ from pycaliper.per import SpecModule
 
 from pycaliper.pycconfig import DesignConfig, PYConfig, Design
 from pycaliper.jginterface.jgdesign import JGDesign
-from pycaliper.verif.jgverifier import JGVerifier1TraceBMC
+from pycaliper.verif.jgverifier import (
+    JGVerifier1TraceBMC,
+    JGVerifier1Trace,
+    JGVerifier2Trace,
+)
 from pycaliper.btorinterface.btordesign import BTORDesign
 from pycaliper.verif.btorverifier import BTORVerifier1Trace
 from pycaliper.verif.refinementverifier import RefinementMap, RefinementVerifier
+
+from pycaliper.pycmanager import get_jgconfig, get_designconfig
 
 from btor2ex.utils import parsewrapper
 
@@ -185,24 +191,33 @@ class ProofManager:
         )
         return des
 
-    def mk_jg_design_from_pyc(self, name: str, pyc: PYConfig) -> Design:
-        """Creates a JGDesign from a PYConfig.
+    def mk_jg_design_from_pyc(
+        self, name: str, jasper_config_path: str, design_config_path: str
+    ) -> Design:
+        """Creates a JGDesign from Jasper and Design config paths.
 
         Args:
             name (str): The name of the design.
-            pyc (PYConfig): The PYConfig object.
+            jasper_config_path (str): Path to the Jasper config JSON file.
+            design_config_path (str): Path to the design config JSON file.
 
         Returns:
             Design: The created JGDesign object.
         """
         if name in self.designs:
             logger.warning(f"Design {name} already exists.")
+        jgc = get_jgconfig(jasper_config_path)
+        dc = get_designconfig(design_config_path)
+        pyc = PYConfig(jgc=jgc, dc=dc)
         des = JGDesign(name, pyc)
         self.designs[name] = des
 
         self._push_update(
             GUIPacket(
-                t=GUIPacket.T.NEW_DESIGN, dname=name, file=pyc.jgc.pycfile, params=None
+                t=GUIPacket.T.NEW_DESIGN,
+                dname=name,
+                file=f"JG: {jasper_config_path}, DC: {design_config_path}",
+                params=None,
             )
         )
         return des
@@ -244,6 +259,94 @@ class ProofManager:
             )
         )
         pr = OneTraceIndPR(spec=spec.name, design=design.name, dc=dc, result=res)
+        self.proofs.append(pr)
+        return pr
+
+    def mk_jg_proof_one_trace(
+        self, spec: SpecModule | str, design: Design | str
+    ) -> ProofResult:
+        """Creates a JG proof for one trace property verification.
+
+        Args:
+            spec (SpecModule | str): The specification module or name.
+            design (Design | str): The design or name.
+
+        Returns:
+            ProofResult: The result of the proof.
+        """
+        if isinstance(spec, str):
+            if spec not in self.specs:
+                raise ValueError(f"Spec {spec} not found.")
+            spec = self.specs[spec]
+        if isinstance(design, str):
+            if design not in self.designs:
+                raise ValueError(f"Design {design} not found.")
+            design = self.designs[design]
+
+        assert isinstance(
+            design, JGDesign
+        ), "Design must be a JGDesign for Jasper verification."
+
+        mock_or_connect(design.pyc.mock, design.pyc.jgc.port)
+        verifier = JGVerifier1Trace()
+
+        res = verifier.verify(spec, design.pyc)
+        pr = OneTraceIndPR(
+            spec=spec.name, design=design.name, dc=design.pyc.dc, result=res
+        )
+
+        self._push_update(
+            GUIPacket(
+                t=GUIPacket.T.NEW_PROOF,
+                iden=str(len(self.proofs)),
+                proofterm=str(pr),
+                result=("PASS" if res else "FAIL"),
+            )
+        )
+        self.proofs.append(pr)
+        return pr
+
+    def mk_jg_proof_two_trace(
+        self, spec: SpecModule | str, design: Design | str
+    ) -> ProofResult:
+        """Creates a JG proof for two trace property verification.
+
+        Args:
+            spec (SpecModule | str): The specification module or name.
+            design (Design | str): The design or name.
+
+        Returns:
+            ProofResult: The result of the proof.
+        """
+        if isinstance(spec, str):
+            if spec not in self.specs:
+                raise ValueError(f"Spec {spec} not found.")
+            spec = self.specs[spec]
+        if isinstance(design, str):
+            if design not in self.designs:
+                raise ValueError(f"Design {design} not found.")
+            design = self.designs[design]
+
+        assert isinstance(
+            design, JGDesign
+        ), "Design must be a JGDesign for Jasper verification."
+
+        mock_or_connect(design.pyc.mock, design.pyc.jgc.port)
+        verifier = JGVerifier2Trace()
+
+        res = verifier.verify(spec, design.pyc)
+        pr = TwoTraceIndPR(
+            spec=spec.name, design=design.name, result=res, dc=design.pyc.dc
+        )
+
+        self._push_update(
+            GUIPacket(
+                t=GUIPacket.T.NEW_PROOF,
+                iden=str(len(self.proofs)),
+                proofterm=str(pr),
+                result=("PASS" if res else "FAIL"),
+            )
+        )
         self.proofs.append(pr)
         return pr
 
