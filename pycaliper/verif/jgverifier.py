@@ -47,7 +47,7 @@ class JGVerifier1Trace:
         Returns:
             bool: True if the module is safe, False otherwise.
         """
-        setup_jasper(specmodule, pyconfig.jgc, pyconfig.dc)
+        setup_jasper(pyconfig.jgc, pyconfig.dc, specmodule)
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
             specmodule,
@@ -84,7 +84,7 @@ class JGVerifier2Trace:
         Returns:
             bool: True if the module is safe, False otherwise.
         """
-        setup_jasper(specmodule, pyconfig.jgc, pyconfig.dc)
+        setup_jasper(pyconfig.jgc, pyconfig.dc, specmodule)
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
             specmodule, filename=pyconfig.jgc.pycfile_abspath(), dc=pyconfig.dc
@@ -118,7 +118,7 @@ class JGVerifier1TraceBMC:
         Returns:
             bool: True if the module is safe, False otherwise.
         """
-        setup_jasper(specmodule, pyconfig.jgc, pyconfig.dc)
+        setup_jasper(pyconfig.jgc, pyconfig.dc, specmodule)
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
             specmodule, filename=pyconfig.jgc.pycfile_abspath(), dc=pyconfig.dc
