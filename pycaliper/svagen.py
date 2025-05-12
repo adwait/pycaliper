@@ -1,5 +1,5 @@
 """
-    Generate SVA (wires, assumes, asserts) for specifications in PER
+Generate SVA (wires, assumes, asserts) for specifications in PER
 """
 
 import sys
@@ -72,6 +72,7 @@ class SVAContext(BaseModel):
     asrts_1trace: list[str] = []
     assms_bmc: dict[str, list[str]] = {}
     asrts_bmc: dict[str, list[str]] = {}
+    seq_props: list[str] = []
 
 
 class SVAGen:
@@ -303,9 +304,6 @@ class SVAGen:
         """
         Generate properties for each step in the simulation
 
-        Args:
-            dc (DesignConfig): Design configuration
-
         Returns:
             list[str]: List of properties for each step
         """
@@ -341,6 +339,57 @@ class SVAGen:
                 )
 
         return properties
+
+    def _generate_seq_decls(self) -> list[str]:
+        """
+        Generate properties for each sequential implication property
+
+        Returns:
+            list[str]: List of properties for each step
+        """
+        properties = []
+        sequences = []
+        for sched_name, sched in self.topmod._pycinternal__seqprops.items():
+            steps = sched._pycinternal__steps
+            sched_assumes = []
+            sched_asserts = []
+            # self.property_context.assms_bmc[sched_name] = []
+            # self.property_context.asrts_bmc[sched_name] = []
+            for i, step in enumerate(steps):
+                assumes = [
+                    expr.get_sva(self.dc.cpy1) for expr in step._pycinternal__assume
+                ]
+                assume_spec = "(\n\t" + " && \n\t".join(assumes + ["1'b1"]) + ")"
+                asserts = [
+                    expr.get_sva(self.dc.cpy1) for expr in step._pycinternal__assert
+                ]
+                assert_spec = "(\n\t" + " && \n\t".join(asserts + ["1'b1"]) + ")"
+                sched_assumes.append(assume_spec)
+                sched_asserts.append(assert_spec)
+
+            assm_sequence_ = " ##1 ".join(sched_assumes)
+            assm_sequence = (
+                f"sequence {get_assm_sequence(sched_name)};\n"
+                + f"\t({assm_sequence_});\n"
+                + "endsequence\n"
+            )
+            assert_sequence_ = " ##1 ".join(sched_asserts)
+            assert_sequence = (
+                f"sequence {get_assrt_sequence(sched_name)};\n"
+                + f"\t({assert_sequence_});\n"
+                + "endsequence\n"
+            )
+
+            sequences.append(assm_sequence)
+            sequences.append(assert_sequence)
+
+            properties.append(
+                f"{get_as_prop(TOP_SEQ_PROP(sched_name))} : assert property\n"
+                + f"\t({get_assm_sequence(sched_name)} |-> {get_assrt_sequence(sched_name)});"
+            )
+            self.property_context.seq_props.append(TOP_SEQ_PROP(sched_name))
+
+        return properties, sequences
 
     def counter_step(self, kd: int, td: int):
         """
@@ -387,6 +436,9 @@ class SVAGen:
         properties, all_decls = self._generate_decls()
         properties.extend(self._generate_step_decls())
 
+        seq_props, seq_decls = self._generate_seq_decls()
+        properties.extend(seq_props)
+
         aux_modules = []
         # Get auxiliary modules if any
         for _, aux_mod in self.topmod._pycinternal__auxmodules.items():
@@ -427,6 +479,10 @@ class SVAGen:
                     f.write(spec.state_inv_spec_decl_single + "\n")
                     f.write(spec.output_inv_spec_decl_single + "\n")
 
+            f.write("\n")
+            f.write("/////////////////////////////////////\n")
+            f.write("// Sequences for top module\n")
+            f.write("\n\n".join(seq_decls))
             f.write("\n")
             f.write("/////////////////////////////////////\n")
             f.write("// Assumptions and Assertions for top module\n")
