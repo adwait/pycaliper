@@ -27,7 +27,7 @@ from pycaliper.pycmanager import (
     mock_or_connect,
 )
 from pycaliper.jginterface.hierarchyexplorer import HierarchyExplorer
-from pycaliper.jginterface.jgsetup import setup_jasper
+from pycaliper.jginterface.jgsetup import setup_jasperharness
 
 import typer
 from typer import Argument, Option
@@ -287,8 +287,7 @@ def jasperharness_main(
     )
     jgconfig = get_jgconfig(args.jgcpath)
     dc = get_designconfig(args.dcpath)
-    mock_or_connect(False, jgconfig.port)
-    setup_jasper(jgconfig, dc)
+    setup_jasperharness(jgconfig, dc)
 
 
 def main():

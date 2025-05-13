@@ -11,13 +11,15 @@ import logging
 from ..pycconfig import PYConfig, Design
 
 from .. import svagen
-from ..jginterface.jgsetup import setup_jasper
+from ..jginterface.jgsetup import setup_jasperharness
 from ..jginterface.jgoracle import (
     prove_out_induction_1t,
     prove_out_induction_2t,
     prove_out_bmc,
     prove_seq,
     loadscript,
+    set_trace_length,
+    setjwd,
     is_pass,
     set_assm_induction_1t,
     set_assm_induction_2t,
@@ -48,7 +50,8 @@ class JGVerifier1Trace:
         Returns:
             bool: True if the module is safe, False otherwise.
         """
-        setup_jasper(pyconfig.jgc, pyconfig.dc, specmodule)
+        setup_jasperharness(pyconfig.jgc, pyconfig.dc)
+        setjwd(pyconfig.jgc.jdir)
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
             specmodule,
@@ -59,6 +62,7 @@ class JGVerifier1Trace:
         self.candidates = svageni.holes
 
         loadscript(pyconfig.jgc.script)
+        set_trace_length(specmodule.get_unroll_kind_depths()[1])
         # Enable the assumptions for 1 trace verification
         set_assm_induction_1t(pyconfig.jgc.context, svageni.property_context)
 
@@ -85,13 +89,15 @@ class JGVerifier2Trace:
         Returns:
             bool: True if the module is safe, False otherwise.
         """
-        setup_jasper(pyconfig.jgc, pyconfig.dc, specmodule)
+        setup_jasperharness(pyconfig.jgc, pyconfig.dc, specmodule)
+        setjwd(pyconfig.jgc.jdir)
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
             specmodule, filename=pyconfig.jgc.pycfile_abspath(), dc=pyconfig.dc
         )
 
         loadscript(pyconfig.jgc.script)
+        set_trace_length(specmodule.get_unroll_kind_depths()[1])
         # Enable the assumptions for 2 trace verification
         set_assm_induction_2t(pyconfig.jgc.context, svageni.property_context)
 
@@ -119,7 +125,8 @@ class JGVerifier1TraceBMC:
         Returns:
             bool: True if the module is safe, False otherwise.
         """
-        setup_jasper(pyconfig.jgc, pyconfig.dc, specmodule)
+        setup_jasperharness(pyconfig.jgc, pyconfig.dc, specmodule)
+        setjwd(pyconfig.jgc.jdir)
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
             specmodule, filename=pyconfig.jgc.pycfile_abspath(), dc=pyconfig.dc
@@ -127,6 +134,7 @@ class JGVerifier1TraceBMC:
         self.candidates = svageni.holes
 
         loadscript(pyconfig.jgc.script)
+        set_trace_length(specmodule.get_unroll_kind_depths()[1])
         # Enable the assumptions for 1 trace verification
         set_assm_bmc(pyconfig.jgc.context, svageni.property_context, schedule)
 
@@ -164,7 +172,8 @@ class JGVerifier1TraceInvariant:
         Returns:
             bool: True if the module is safe, False otherwise.
         """
-        setup_jasper(pyconfig.jgc, pyconfig.dc, specmodule)
+        setup_jasperharness(pyconfig.jgc, pyconfig.dc, specmodule)
+        setjwd(pyconfig.jgc.jdir)
         svageni = svagen.SVAGen()
         svageni.create_pyc_specfile(
             specmodule, filename=pyconfig.jgc.pycfile_abspath(), dc=pyconfig.dc
@@ -172,6 +181,7 @@ class JGVerifier1TraceInvariant:
         self.candidates = svageni.holes
 
         loadscript(pyconfig.jgc.script)
+        set_trace_length(specmodule.get_unroll_kind_depths()[1])
         # # Enable the assumptions for 1 trace verification
         # set_assm_bmc(pyconfig.jgc.context, svageni.property_context, schedule)
 

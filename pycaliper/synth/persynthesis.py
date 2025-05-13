@@ -18,7 +18,7 @@ from ..per import SpecModule, PERHole, Context, Logic
 from .iis_strategy import *
 
 from pycaliper.svagen import SVAGen
-from pycaliper.jginterface.jgsetup import setup_jasper, JasperConfig
+from pycaliper.jginterface.jgsetup import JasperConfig, setup_jasperharness
 from pycaliper.jginterface.jgoracle import (
     prove,
     prove_out_induction_2t,
@@ -27,6 +27,8 @@ from pycaliper.jginterface.jgoracle import (
     enable_assm,
     disable_assm,
     loadscript,
+    set_trace_length,
+    setjwd,
 )
 from pycaliper.pycconfig import Design, DesignConfig
 from pycaliper.jginterface.jgdesign import JGDesign
@@ -416,7 +418,8 @@ class HoudiniSynthesizerJG(HoudiniSynthesizer):
         """Set up the synthesis process for JasperGold."""
         assert isinstance(self.des, JGDesign), "Design not of type JGDesign."
         self.jgc: JasperConfig = self.des.pyc.jgc
-        setup_jasper(self.jgc, self.dc, self.specmodule)
+        setup_jasperharness(self.jgc, self.dc, self.specmodule)
+        setjwd(self.jgc.jdir)
         self.svagen = SVAGen()
         self.svagen.create_pyc_specfile(
             self.specmodule, filename=self.jgc.pycfile_abspath(), dc=self.dc
@@ -430,6 +433,7 @@ class HoudiniSynthesizerJG(HoudiniSynthesizer):
         """Restart the synthesis process for JasperGold."""
         # Load the script
         loadscript(self.jgc.script)
+        set_trace_length(self.specmodule.get_unroll_kind_depths()[1])
         # Enable and disable the right assumptions
         set_assm_induction_2t(self.jgc.context, self.svagen.property_context)
 
@@ -721,7 +725,8 @@ class PERSynthesizer:
         # Create a new SVA generator
         assert topmod.is_instantiated(), "Module not instantiated."
 
-        setup_jasper(self.pyconfig.jgc, self.pyconfig.dc, topmod)
+        setup_jasperharness(self.pyconfig.jgc, self.pyconfig.dc, topmod)
+        setjwd(self.pyconfig.jgc.jdir)
         self.svagen = SVAGen()
         self.svagen.create_pyc_specfile(
             topmod, filename=self.pyconfig.jgc.pycfile_abspath(), dc=self.pyconfig.dc
@@ -740,6 +745,7 @@ class PERSynthesizer:
         for i in range(retries):
             # Load the script
             loadscript(self.pyconfig.jgc.script)
+            set_trace_length(topmod.get_unroll_kind_depths()[1])
             # Enable and disable the right assumptions
             set_assm_induction_2t(
                 self.pyconfig.jgc.context, self.svagen.property_context

@@ -142,9 +142,10 @@ endmodule
 """
 
 
-def setup_jasper(jgc: JasperConfig, dc: DesignConfig, mod: SpecModule = None) -> bool:
+def setup_jasperharness(
+    jgc: JasperConfig, dc: DesignConfig, mod: SpecModule = None
+) -> bool:
 
-    setjwd(jgc.jdir)
     if dc.topmod == "":
         logger.warning("Top module name is not set, skipping Jasper setup.")
         return False

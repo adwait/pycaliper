@@ -200,6 +200,20 @@ def setjwd(jwd):
     return res
 
 
+def set_trace_length(k: int) -> str:
+    """Set the trace length for the proof.
+
+    Args:
+        k (int): Trace length.
+
+    Returns:
+        str: Trace length string.
+    """
+    res = jgc.eval(f"set_max_trace_length {k}")
+    logger.debug(f"Setting trace length to {k}")
+    return res
+
+
 # def create_auxreg(name, width):
 #     connectcmd = f"connect -bind auxreg {name} -parameter WIDTH {width}"
 #     elabcmd = f"connect -elaborate"
