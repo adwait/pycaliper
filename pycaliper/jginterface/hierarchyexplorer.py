@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from pycaliper.per.per import SpecModule, Logic, LogicArray, Path
 from pycaliper.pycconfig import JasperConfig, DesignConfig
-from pycaliper.jginterface.jgoracle import loadscript
+from pycaliper.jginterface.jgoracle import loadscript, setjwd
 
 
 from . import jasperclient as jgc
@@ -50,6 +50,7 @@ class HierarchyExplorer:
 
     def load(self):
         if not self.loaded:
+            setjwd(self.jgc.jdir)
             loadscript(self.jgc.script)
             self.loaded = True
 

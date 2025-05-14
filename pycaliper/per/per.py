@@ -1380,9 +1380,6 @@ class SpecModule:
             "\tdef __init__(self, name = '', **kwargs):",
             f"\t\tsuper().__init__(name, kwargs)",
         ]
-        inits.append(
-            f'\t\tself.{nonreserved_or_fresh(self._pycinternal__clk.name)} = Clock("{self._pycinternal__clk.name}")'
-        )
         for s, t in self._pycinternal__signals.items():
             if isinstance(t, AuxReg):
                 inits.append(
@@ -1407,6 +1404,9 @@ class SpecModule:
             inits.append(
                 f'\t\tself.{nonreserved_or_fresh(t.name)} = {t.__class__.__name__}("{t.name}")'
             )
+        inits.append(
+            f'\t\tself.{nonreserved_or_fresh(self._pycinternal__clk.name)} = Clock("{self._pycinternal__clk.name}")'
+        )
         initstring = "\n".join(inits)
         for s, t in self._pycinternal__submodules.items():
             inits.append(
