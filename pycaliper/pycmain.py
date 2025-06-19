@@ -18,7 +18,16 @@ from pycaliper.verif.jgverifier import (
 from pycaliper.synth.persynthesis import PERSynthesizer
 from pycaliper.synth.iis_strategy import SeqStrategy, RandomStrategy, LLMStrategy
 from pycaliper.svagen import SVAGen
-from pycaliper.pycmanager import start, PYCTask, PYCArgs
+from pycaliper.pycmanager import (
+    start,
+    PYCTask,
+    PYCArgs,
+    get_jgconfig,
+    get_designconfig,
+    mock_or_connect,
+)
+from pycaliper.jginterface.hierarchyexplorer import HierarchyExplorer
+from pycaliper.jginterface.jgsetup import setup_jasperharness
 
 import typer
 from typer import Argument, Option
@@ -221,6 +230,64 @@ def svagen_main(
     svagen.create_pyc_specfile(
         module, filename=pyconfig.jgc.pycfile_abspath(), dc=pyconfig.dc
     )
+
+
+@app.command("genhierarchy")
+def genhierarchy_main(
+    # Allow providing a configuration for Jasper
+    jgcpath: Annotated[
+        str, Option("-j", "--jgc", help="Path to the Jasper config file")
+    ] = "",
+    dcpath: Annotated[
+        str, Option("-d", "--dc", help="Path to the design configuration file")
+    ] = "",
+    # Allow using -s or --sdir
+    path: Annotated[str, Option(help="File to save results to.")] = "",
+    # Root module
+    root: Annotated[str, Option(help="Root module name.")] = "",
+    # Hierarchy exploration depth
+    depth: Annotated[
+        int,
+        Option(help="Depth of hierarchy exploration. Default is full exploration (-1)"),
+    ] = -1,
+):
+    args = PYCArgs(
+        specpath="",
+        jgcpath=jgcpath,
+        dcpath="",
+        params="",
+        sdir="",
+    )
+    jgconfig = get_jgconfig(jgcpath)
+    dc = get_designconfig(dcpath)
+    mock_or_connect(False, jgconfig.port)
+    dexplorer = HierarchyExplorer(jgconfig, dc)
+    mod = dexplorer.generate_skeleton(root, depth)
+    # Save the module
+    with open(path, "x") as f:
+        f.write(mod.full_repr())
+    logger.info(f"Specification written to {path}.")
+
+
+@app.command("jasperharness")
+def jasperharness_main(
+    jgcpath: Annotated[
+        str, Option("-j", "--jgc", help="Path to the Jasper config file")
+    ] = "",
+    dcpath: Annotated[
+        str, Option("-d", "--dc", help="Path to the design configuration file")
+    ] = "",
+):
+    args = PYCArgs(
+        specpath="",
+        jgcpath=jgcpath,
+        dcpath=dcpath,
+        params="",
+        sdir="",
+    )
+    jgconfig = get_jgconfig(args.jgcpath)
+    dc = get_designconfig(args.dcpath)
+    setup_jasperharness(jgconfig, dc)
 
 
 def main():

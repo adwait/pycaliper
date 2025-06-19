@@ -4,7 +4,7 @@ import os
 
 from . import jasperclient as jgc
 from ..svagen import SVAContext
-from ..propns import TOP_STEP_PROP
+from ..propns import TOP_STEP_PROP, TOP_SEQ_PROP
 
 logger = logging.getLogger(__name__)
 
@@ -165,6 +165,10 @@ def prove_out_bmc(taskcon, svacon: SVAContext, sched: str) -> list[ProofResult]:
     return results
 
 
+def prove_seq(taskcon, svacon: SVAContext, sched: str) -> ProofResult:
+    return prove(taskcon, TOP_SEQ_PROP(sched))
+
+
 def loadscript(script):
     # Get pwd
     cmd = f"include {script}"
@@ -193,6 +197,20 @@ def setjwd(jwd):
     cmd = f"cd {pwd}/{jwd}"
     res = jgc.eval(cmd)
     logger.debug(f"Changing Jasper working directory to {jwd} returned {res}")
+    return res
+
+
+def set_trace_length(k: int) -> str:
+    """Set the trace length for the proof.
+
+    Args:
+        k (int): Trace length.
+
+    Returns:
+        str: Trace length string.
+    """
+    res = jgc.eval(f"set_max_trace_length {k}")
+    logger.debug(f"Setting trace length to {k}")
     return res
 
 
