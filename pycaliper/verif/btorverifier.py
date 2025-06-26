@@ -19,7 +19,7 @@ from ..pycconfig import DesignConfig
 from ..btorinterface.pycbtorinterface import PYCBTORInterface, BTORVerifResult
 from ..btorinterface.btordesign import BTORDesign
 from ..btorinterface.vcdgenerator import write_vcd
-from ..per import SpecModule
+from ..per import SpecModule, SimulationSchedule
 
 logger = logging.getLogger(__name__)
 
@@ -369,5 +369,128 @@ class BTORVerifier1Trace(PYCBTORInterface):
             self.symex.slv.pop()
 
         logger.debug("No bug found, inductive proof complete")
+        # Safe
+        return BTORVerifResult(True, None)
+
+class BTORVerifierBMC(PYCBTORInterface):
+    """Verifier for BTOR designs using one-trace BMC."""
+
+    def __init__(self, gui=None):
+        """Initialize the BTORVerifierBMC.
+
+        Args:
+            gui: Optional GUI interface.
+        """
+        super().__init__(gui)
+
+    def _setup_bmc(
+        self,
+        prog: list[prg.Instruction],
+        specmodule: SpecModule,
+        des: BTORDesign,
+        dc: DesignConfig
+    ):
+        """Set up the BMC verification.
+
+        Args:
+            prog (list[prg.Instruction]): The program instructions.
+            specmodule (SpecModule): The specification module.
+            des (BTORDesign): The BTOR design.
+            dc (DesignConfig): The design configuration.
+
+        Returns:
+            tuple: Assumptions and assertions for verification.
+        """
+        self.symex = BTOR2Ex(BoolectorSolver("btor2"), prog, self.gui)
+        self.cpy1 = dc.cpy1
+        self.des = des
+        self.specmodule = specmodule
+        assert self.specmodule.is_instantiated(), "Module not instantiated."
+
+        if (
+            self.specmodule._pycinternal__perholes
+            or self.specmodule._pycinternal__caholes
+        ):
+            logger.warn("Holes found in a verifier, ignoring them.")
+
+        return
+        
+
+    def verify(
+        self,
+        specmodule: SpecModule,
+        des: BTORDesign,
+        dc: DesignConfig,
+        sched_str: str
+    ) -> BTORVerifResult:
+        """Perform verification for a single module of the following property:
+            input_eq && state_eq |-> ##1 output_eq && state_eq
+
+        Args:
+            specmodule (SpecModule): The specification module.
+            des (BTORDesign): The BTOR design.
+            dc (DesignConfig): The design configuration.
+
+        Returns:
+            BTORVerifResult: The verification result.
+        """
+        prog = des.prgm
+        self._setup_bmc(prog, specmodule, des, dc)
+        # Generate the assumptions and assertions
+        simsched = self.specmodule._pycinternal__simsteps[sched_str]
+        k = simsched.depth
+        logger.debug(f"Performing verification with depth %s", simsched.depth)
+    
+        assms = []
+        asrts = []
+        for i in range(k):
+            # Unroll 2k times
+            self._internal_execute()
+
+            # Collect all assumptions
+            assms.append(
+                self._get_prepost_assm_constraints_at_cycle(
+                    simsched._pycinternal__steps[i]._pycinternal__assume, i, self.cpy1))
+
+            # Check final state (note that unrolling has one extra state)
+            asrts.append(
+                self._get_assrt_constraints_at_cycle(
+                    simsched._pycinternal__steps[i]._pycinternal__assert, i, self.cpy1))
+
+        # Clocking behaviour
+        clk_assms = self._get_clock_constraints()
+
+        
+        for i in range(k):
+            for asrt_expr, asrt in zip(simsched._pycinternal__steps[i]._pycinternal__assert, asrts[i]):
+                for j in range(i+1):
+                    for assm in assms[j]:
+                        # self.dump_and_wait(assm)
+                        self.symex.slv.mk_assume(assm)
+                for clk_assm in clk_assms:
+                    # self.dump_and_wait(clk_assm)
+                    self.symex.slv.mk_assume(clk_assm)
+                for assmdict in self.symex.prgm_assms:
+                    for _, assmi in assmdict.items():
+                        self.symex.slv.mk_assume(assmi)
+
+                self.symex.slv.push()
+                # self.dump_and_wait(asrt)
+                self.symex.slv.mk_assert(asrt)
+                # self.dump_and_wait(asrt)
+                result = self.symex.slv.check_sat()
+                logger.debug(
+                    "For assertion %s, at step %s: result %s", asrt_expr, i, "BUG" if result else "SAFE"
+                )
+                if result:
+                    logger.debug("Found a counterexample")
+                    btor_model = self.symex.get_model()
+                    logger.debug("Model:\n%s", btor_model)
+                    vcd_content = write_vcd(btor_model.signals, btor_model.assignments)
+                    res = BTORVerifResult(False, vcd_content)
+                    return res
+                self.symex.slv.pop()
+
+        logger.debug("No bug found, BMC proof complete")
         # Safe
         return BTORVerifResult(True, None)

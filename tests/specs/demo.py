@@ -4,6 +4,9 @@ from pycaliper.per.per import unroll
 DONE = Const(3, 2)
 
 
+LIMIT = 6 # SAFE
+# LIMIT = 7 # UNSAFE
+
 class demo(SpecModule):
     def __init__(self, name="", **kwargs) -> None:
         super().__init__(name, **kwargs)
@@ -33,8 +36,8 @@ class demo(SpecModule):
         else:
             self.pycassume(self.rst)
 
-    # @unroll(10)
-    # def simstep(self, i: int = 0) -> None:
-    #     if i > 0:
-    #         self.pycassert(~(self.state_ == DONE) | (self.counter >= Const(5, 3)))
-    #     self.get_reset_seq(i)
+    @unroll(9)
+    def simstep(self, i: int = 0) -> None:
+        if i > 0:
+            self.pycassert(~(self.state_ == DONE) | (self.counter >= Const(LIMIT, 3)))
+        self.get_reset_seq(i)

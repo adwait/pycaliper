@@ -26,6 +26,7 @@ from .per import (
     kinduct,
     rose,
     fell,
+    SimulationSchedule,
 )
 
 from .expr import *
