@@ -1225,7 +1225,7 @@ class SpecModule:
 
         if self._pycinternal__clk is None:
             logger.debug("No clock signal defined, defaulting to 'clk'")
-            self._pycinternal__clk = Clock("clk")
+            self._pycinternal__clk = Clock("clk").instantiate(path.add_level("clk"))
 
         self._pycinternal__signals = sigattrs
         self._pycinternal__groups = groupattrs
