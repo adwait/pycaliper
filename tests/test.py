@@ -4,7 +4,7 @@ import os
 import unittest
 from tempfile import NamedTemporaryFile
 
-from pycaliper.pycmanager import PYCArgs, PYCTask, start
+from pycaliper.pycsetup import PYCArgs, PYCTask, start
 from pycaliper.proofmanager import mk_btordesign, ProofManager
 from pycaliper.frontend.pyclex import lexer
 from pycaliper.frontend.pycparse import parser
@@ -84,27 +84,25 @@ class JGVerifierTest(unittest.TestCase):
         return start(PYCTask.VERIFBMC, args)
 
     def test_regblock(self):
-        (pyconfig, tmgr, regb) = self.gen_test(
+        (pyconfig, regb) = self.gen_test(
             "tests/specs/regblock", "examples/designs/regblock/config.json"
         )
         invverif = JGVerifier2Trace()
         regb.instantiate()
         invverif.verify(regb, pyconfig)
-        tmgr.close()
 
     def test_counter(self):
-        (pyconfig, tmgr, counter) = self.gen_test(
+        (pyconfig, counter) = self.gen_test(
             "tests/specs/counter", "examples/designs/counter/config.json"
         )
         invverif = JGVerifier1Trace()
         counter.instantiate()
         invverif.verify(counter, pyconfig)
-        tmgr.close()
 
 
 class JGSynthesisTest(unittest.TestCase):
     def test_jgsynthesizer(self):
-        pyconfig, tmgr, module = start(
+        pyconfig, module = start(
             PYCTask.PERSYNTH,
             PYCArgs(
                 specpath="tests/specs/regblock_syn.regblock_syn",
@@ -119,8 +117,6 @@ class JGSynthesisTest(unittest.TestCase):
         finalmod, _ = synthesizer.synthesize(
             module, JGDesign("regblock", pyconfig), pyconfig.dc, strategy=SeqStrategy()
         )
-        tmgr.save_spec(finalmod)
-        tmgr.close()
 
 
 class JGBMCTest(unittest.TestCase):
@@ -136,14 +132,13 @@ class JGBMCTest(unittest.TestCase):
         return start(PYCTask.VERIFBMC, args)
 
     def test_adder(self):
-        (pyconfig, tmgr, module) = self.gen_test(
+        (pyconfig, module) = self.gen_test(
             "tests/specs/adder.adder", "examples/designs/adder/config.json", "simstep"
         )
         verifier = JGVerifier1TraceBMC()
         logger.debug("Running BMC verification.")
         module.instantiate()
         verifier.verify(module, pyconfig, "simstep")
-        tmgr.close()
 
 
 class ParserTest(unittest.TestCase):

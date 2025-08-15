@@ -9,30 +9,43 @@ Author: Adwait Godbole, UC Berkeley
 
 from typing import Callable
 
-from pycaliper.pycmanager import mock_or_connect
 from pycaliper.pycgui import GUIPacket, WebGUI, RichGUI
 
 import btoropt
 from pycaliper.per import SpecModule
 
-from pycaliper.pycconfig import DesignConfig, PYConfig, Design
+from pycaliper.pycconfig import DesignConfig, PYConfig, Design, JasperConfig
 from pycaliper.jginterface.jgdesign import JGDesign
 from pycaliper.verif.jgverifier import (
     JGVerifier1TraceBMC,
     JGVerifier1Trace,
     JGVerifier2Trace,
+    JGVerifier1TraceInvariant,
 )
 from pycaliper.btorinterface.btordesign import BTORDesign
-from pycaliper.verif.btorverifier import BTORVerifier1Trace
+from pycaliper.verif.btorverifier import BTORVerifier1Trace, BTORVerifier2Trace
 from pycaliper.verif.refinementverifier import RefinementMap, RefinementVerifier
+from pycaliper.synth.persynthesis import (
+    PERSynthesizer,
+    HoudiniSynthesizerJG,
+    HoudiniSynthesizerBTOR,
+    HoudiniSynthesizerConfig,
+    HoudiniSynthesizerStats,
+)
+from pycaliper.synth.alignsynthesis import AlignSynthesizer
+from pycaliper.synth.iis_strategy import SeqStrategy, RandomStrategy, LLMStrategy, IISStrategy
+from pycaliper.svagen import SVAGen
 
-from pycaliper.pycmanager import get_jgconfig, get_designconfig
 
 from btor2ex.utils import parsewrapper
 
 from dataclasses import dataclass
-
+import json
+import sys
 import logging
+from jsonschema import validate
+from jsonschema.exceptions import ValidationError
+from pycaliper.jginterface import jasperclient as jgc
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +125,124 @@ def mk_btordesign(name: str, filename: str) -> BTORDesign:
     return BTORDesign(name, prgm)
 
 
+# Configuration schemas
+JG_CONFIG_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "jasper": {
+            "type": "object",
+            "properties": {
+                # The Jasper working directory relative to the pycaliper directory
+                "jdir": {"type": "string"},
+                # The TCL script relative to the Jasper working directory
+                "script": {"type": "string"},
+                # Location of the generated SVA file relative to the Jasper working directory
+                "pycfile": {"type": "string"},
+                # Proof node context
+                "context": {"type": "string"},
+                # Design list file
+                "design_list": {"type": "string"},
+                # Port number to connect to Jasper server
+                "port": {"type": "integer"},
+            },
+            "required": ["jdir", "script", "pycfile", "context"],
+        }
+    },
+    "required": ["jasper"],
+    "additionalProperties": False,
+}
+
+
+D_CONFIG_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "cpy1": {"type": "string"},
+        "cpy2": {"type": "string"},
+        "topmod": {"type": "string"},
+        "lang": {"type": "string"},
+        "clk": {"type": "string"},
+    },
+    "required": ["cpy1", "topmod"],
+    "additionalProperties": False,
+}
+
+
+def mock_or_connect(mock: bool, port: int) -> bool:
+    """Connect to Jasper or run in mock mode.
+
+    Args:
+        mock (bool): True if running in mock mode, False if connected to Jasper.
+        port (int): Port number to connect to Jasper.
+
+    Returns:
+        bool: True if connected to Jasper, False if running in mock mode.
+    """
+    if mock:
+        logger.info("Running in mock mode.")
+        return False
+    else:
+        jgc.connect_tcp("localhost", port)
+        return True
+
+
+def get_jgconfig(jgcpath: str) -> JasperConfig:
+    """Load and validate Jasper configuration from file.
+
+    Args:
+        jgcpath (str): Path to the Jasper configuration JSON file.
+
+    Returns:
+        JasperConfig: The loaded and validated Jasper configuration.
+    """
+    with open(jgcpath, "r") as f:
+        jgconfig = json.load(f)
+    # And validate it
+    try:
+        validate(instance=jgconfig, schema=JG_CONFIG_SCHEMA)
+    except ValidationError as e:
+        logger.error(f"Jasper config schema validation failed: {e.message}")
+        logger.error(
+            f"Please check schema:\n{json.dumps(JG_CONFIG_SCHEMA, indent=4, sort_keys=True, separators=(',', ': '))}"
+        )
+        sys.exit(1)
+    return JasperConfig(
+        jdir=jgconfig["jasper"]["jdir"],
+        script=jgconfig["jasper"]["script"],
+        pycfile=jgconfig["jasper"]["pycfile"],
+        context=jgconfig["jasper"]["context"],
+        design_list=jgconfig["jasper"].get("design_list", "design.lst"),
+        port=jgconfig["jasper"].get("port", 8080),
+    )
+
+
+def get_designconfig(dcpath: str) -> DesignConfig:
+    """Load and validate design configuration from file.
+
+    Args:
+        dcpath (str): Path to the design configuration JSON file.
+
+    Returns:
+        DesignConfig: The loaded and validated design configuration.
+    """
+    with open(dcpath, "r") as f:
+        dconfig = json.load(f)
+    try:
+        validate(instance=dconfig, schema=D_CONFIG_SCHEMA)
+    except ValidationError as e:
+        logger.error(f"Design config schema validation failed: {e.message}")
+        logger.error(
+            f"Please check schema:\n{json.dumps(D_CONFIG_SCHEMA, indent=4, sort_keys=True, separators=(',', ': '))}"
+        )
+        sys.exit(1)
+    return DesignConfig(
+        cpy1=dconfig["cpy1"],
+        cpy2=dconfig.get("cpy2", "b"),
+        lang=dconfig.get("lang", "sv12"),
+        topmod=dconfig["topmod"],
+        clk=dconfig.get("clk", "clk"),
+    )
+
+
 class ProofManager:
     def __init__(self, webgui=False, cligui=False) -> None:
         """Initializes the ProofManager.
@@ -169,6 +300,17 @@ class ProofManager:
             )
         )
         return new_spec
+
+    def save_spec(self, module: SpecModule, filepath: str) -> None:
+        """Save a specification module to a file.
+
+        Args:
+            module (SpecModule): The specification module to save.
+            filepath (str): The path where to save the specification file.
+        """
+        with open(filepath, "w") as f:
+            f.write(module.full_repr())
+        logger.info(f"Specification written to {filepath}.")
 
     def mk_btor_design_from_file(self, file: str, name: str) -> BTORDesign:
         """Creates a BTORDesign from a file.
@@ -262,6 +404,371 @@ class ProofManager:
         self.proofs.append(pr)
         return pr
 
+    def mk_per_synthesis(
+        self,
+        spec: SpecModule | str,
+        strategy: str = "seq",
+        fuel: int = 3,
+        steps: int = 10,
+        retries: int = 1,
+    ) -> SpecModule:
+        """Performs PER synthesis on a specification.
+
+        Args:
+            spec (SpecModule | str): The specification module or name.
+            strategy (str, optional): The synthesis strategy ('seq', 'rand', 'llm'). Defaults to "seq".
+            fuel (int, optional): Fuel budget for synthesis. Defaults to 3.
+            steps (int, optional): Step budget for synthesis. Defaults to 10.
+            retries (int, optional): Number of retries. Defaults to 1.
+
+        Returns:
+            SpecModule: The synthesized specification module.
+        """
+        if isinstance(spec, str):
+            if spec not in self.specs:
+                raise ValueError(f"Spec {spec} not found.")
+            spec = self.specs[spec]
+
+        # Get strategy
+        strat = self.get_strategy(strategy)
+        
+        # Create a PYConfig - this is a simplified version for PER synthesis
+        # In practice, this would need proper Jasper configuration
+        jgc = JasperConfig(
+            jdir="temp", script="temp.tcl", pycfile="temp.sv", context="temp"
+        )
+        dc = DesignConfig(cpy1="a", topmod="top")
+        pyconfig = PYConfig(jgc=jgc, dc=dc)
+
+        synthesizer = PERSynthesizer(pyconfig, strat, fuel, steps)
+        result_spec = synthesizer.synthesize(spec, retries)
+        
+        logger.info(f"PER synthesis completed for spec {spec.name}")
+        return result_spec
+
+    def mk_houdini_synthesis_jg(
+        self,
+        spec: SpecModule | str,
+        design: Design | str,
+        strategy: str = "seq",
+        fuel: int = 10,
+        steps: int = 10,
+    ) -> tuple[SpecModule, HoudiniSynthesizerStats]:
+        """Performs Houdini synthesis using JasperGold.
+
+        Args:
+            spec (SpecModule | str): The specification module or name.
+            design (Design | str): The design or name.
+            strategy (str, optional): The synthesis strategy. Defaults to "seq".
+            fuel (int, optional): Fuel budget for synthesis. Defaults to 10.
+            steps (int, optional): Step budget for synthesis. Defaults to 10.
+
+        Returns:
+            tuple[SpecModule, HoudiniSynthesizerStats]: The synthesized spec and statistics.
+        """
+        if isinstance(spec, str):
+            if spec not in self.specs:
+                raise ValueError(f"Spec {spec} not found.")
+            spec = self.specs[spec]
+        if isinstance(design, str):
+            if design not in self.designs:
+                raise ValueError(f"Design {design} not found.")
+            design = self.designs[design]
+
+        assert isinstance(
+            design, JGDesign
+        ), "Design must be a JGDesign for Houdini JG synthesis."
+
+        strat = self.get_strategy(strategy)
+        config = HoudiniSynthesizerConfig(fuelbudget=fuel, stepbudget=steps)
+        
+        synthesizer = HoudiniSynthesizerJG()
+        result_spec, stats = synthesizer.synthesize(spec, design, design.pyc.dc, strat, config)
+        
+        logger.info(f"Houdini JG synthesis completed for spec {spec.name}")
+        return result_spec, stats
+
+    def mk_houdini_synthesis_btor(
+        self,
+        spec: SpecModule | str,
+        design: Design | str,
+        strategy: str = "seq",
+        fuel: int = 10,
+        steps: int = 10,
+    ) -> tuple[SpecModule, HoudiniSynthesizerStats]:
+        """Performs Houdini synthesis using BTOR.
+
+        Args:
+            spec (SpecModule | str): The specification module or name.
+            design (Design | str): The design or name.
+            strategy (str, optional): The synthesis strategy. Defaults to "seq".
+            fuel (int, optional): Fuel budget for synthesis. Defaults to 10.
+            steps (int, optional): Step budget for synthesis. Defaults to 10.
+
+        Returns:
+            tuple[SpecModule, HoudiniSynthesizerStats]: The synthesized spec and statistics.
+        """
+        if isinstance(spec, str):
+            if spec not in self.specs:
+                raise ValueError(f"Spec {spec} not found.")
+            spec = self.specs[spec]
+        if isinstance(design, str):
+            if design not in self.designs:
+                raise ValueError(f"Design {design} not found.")
+            design = self.designs[design]
+
+        assert isinstance(
+            design, BTORDesign
+        ), "Design must be a BTORDesign for Houdini BTOR synthesis."
+
+        strat = self.get_strategy(strategy)
+        config = HoudiniSynthesizerConfig(fuelbudget=fuel, stepbudget=steps)
+        dc = DesignConfig(cpy1="a", topmod="top")  # Default config
+        
+        synthesizer = HoudiniSynthesizerBTOR(self.gui)
+        result_spec, stats = synthesizer.synthesize(spec, design, dc, strat, config)
+        
+        logger.info(f"Houdini BTOR synthesis completed for spec {spec.name}")
+        return result_spec, stats
+
+    def mk_align_synthesis(
+        self,
+        spec: SpecModule | str,
+        dc: DesignConfig = DesignConfig(),
+        trace_dir: str = None,
+    ) -> SpecModule:
+        """Performs alignment synthesis on a specification.
+
+        Args:
+            spec (SpecModule | str): The specification module or name.
+            dc (DesignConfig, optional): The design configuration. Defaults to DesignConfig().
+            trace_dir (str, optional): Directory containing VCD trace files. Defaults to None.
+
+        Returns:
+            SpecModule: The synthesized specification module.
+        """
+        if isinstance(spec, str):
+            if spec not in self.specs:
+                raise ValueError(f"Spec {spec} not found.")
+            spec = self.specs[spec]
+
+        synthesizer = AlignSynthesizer(trace_dir)
+        result_spec = synthesizer.synthesize(spec, dc)
+        
+        logger.info(f"Alignment synthesis completed for spec {spec.name}")
+        return result_spec
+
+
+    def generate_sva(
+        self,
+        spec: SpecModule | str,
+        output_file: str,
+        dc: DesignConfig = None,
+        onetrace: bool = False,
+    ) -> None:
+        """Generates SystemVerilog Assertions (SVA) from a specification.
+
+        Args:
+            spec (SpecModule | str): The specification module or name.
+            output_file (str): Path to the output SVA file.
+            dc (DesignConfig, optional): Design configuration. Defaults to None.
+            onetrace (bool, optional): Generate one-trace properties only. Defaults to False.
+        """
+        if isinstance(spec, str):
+            if spec not in self.specs:
+                raise ValueError(f"Spec {spec} not found.")
+            spec = self.specs[spec]
+
+        if dc is None:
+            dc = DesignConfig(cpy1="a", topmod="top")
+
+        svagen = SVAGen()
+        svagen.create_pyc_specfile(spec, dc, output_file, onetrace)
+        
+        logger.info(f"SVA generated for spec {spec.name} and saved to {output_file}")
+
+
+    def get_verifier(self, engine_type: str, **kwargs):
+        """Gets a verifier instance of the specified type.
+
+        Args:
+            engine_type (str): The type of verifier ('btor_one_trace', 'btor_two_trace', 
+                              'jg_one_trace', 'jg_two_trace', 'jg_bmc', 'jg_invariant').
+            **kwargs: Additional arguments for the verifier.
+
+        Returns:
+            Verifier: The requested verifier instance.
+        """
+        match engine_type.lower():
+            case "btor_one_trace":
+                return BTORVerifier1Trace(kwargs.get("gui", self.gui))
+            case "btor_two_trace":
+                return BTORVerifier2Trace(kwargs.get("gui", self.gui))
+            case "jg_one_trace":
+                return JGVerifier1Trace()
+            case "jg_two_trace":
+                return JGVerifier2Trace()
+            case "jg_bmc":
+                return JGVerifier1TraceBMC()
+            case "jg_invariant":
+                return JGVerifier1TraceInvariant()
+            case _:
+                raise ValueError(f"Unknown verifier type: {engine_type}")
+
+    def get_synthesizer(self, engine_type: str, **kwargs):
+        """Gets a synthesizer instance of the specified type.
+
+        Args:
+            engine_type (str): The type of synthesizer ('per', 'houdini_jg', 'houdini_btor', 'align').
+            **kwargs: Additional arguments for the synthesizer.
+
+        Returns:
+            Synthesizer: The requested synthesizer instance.
+        """
+        match engine_type.lower():
+            case "per":
+                jgc = kwargs.get("jgc", JasperConfig(jdir="temp", script="temp.tcl", pycfile="temp.sv", context="temp"))
+                dc = kwargs.get("dc", DesignConfig(cpy1="a", topmod="top"))
+                pyconfig = PYConfig(jgc=jgc, dc=dc)
+                strategy = kwargs.get("strategy", SeqStrategy())
+                fuel = kwargs.get("fuel", 3)
+                steps = kwargs.get("steps", 10)
+                return PERSynthesizer(pyconfig, strategy, fuel, steps)
+            case "houdini_jg":
+                return HoudiniSynthesizerJG()
+            case "houdini_btor":
+                return HoudiniSynthesizerBTOR(kwargs.get("gui", self.gui))
+            case "align":
+                trace_dir = kwargs.get("trace_dir", None)
+                return AlignSynthesizer(trace_dir)
+            case _:
+                raise ValueError(f"Unknown synthesizer type: {engine_type}")
+
+    def get_strategy(self, strategy_name: str) -> IISStrategy:
+        """Gets a synthesis strategy instance.
+
+        Args:
+            strategy_name (str): The strategy name ('seq', 'rand', 'llm').
+
+        Returns:
+            IISStrategy: The requested strategy instance.
+        """
+        match strategy_name.lower():
+            case "seq":
+                return SeqStrategy()
+            case "rand" | "random":
+                return RandomStrategy()
+            case "llm":
+                return LLMStrategy()
+            case _:
+                raise ValueError(f"Unknown strategy: {strategy_name}")
+
+
+    def load_spec_from_path(self, specpath: str, name: str = "", params: dict = {}) -> SpecModule:
+        """Loads a specification module from a file path.
+
+        Args:
+            specpath (str): Path to the specification module file.
+            name (str, optional): Name for the spec. If empty, uses the class name.
+            params (dict, optional): Parameters to pass to the specification. Defaults to {}.
+
+        Returns:
+            SpecModule: The loaded and instantiated specification module.
+        """
+        import importlib.util
+        import os
+        
+        # Load the module from file
+        spec_name = os.path.splitext(os.path.basename(specpath))[0]
+        spec = importlib.util.spec_from_file_location(spec_name, specpath)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        
+        # Find the SpecModule class in the module
+        spec_class = None
+        for attr_name in dir(module):
+            attr = getattr(module, attr_name)
+            if (isinstance(attr, type) and 
+                issubclass(attr, SpecModule) and 
+                attr != SpecModule):
+                spec_class = attr
+                break
+        
+        if spec_class is None:
+            raise ValueError(f"No SpecModule class found in {specpath}")
+        
+        # Use class name if no name provided
+        if not name:
+            name = spec_class.__name__
+        
+        # Create and return the spec
+        return self.mk_spec(spec_class, name, **params)
+
+    def mk_design_from_config(
+        self, 
+        name: str, 
+        jgc_path: str = "", 
+        dc_path: str = "",
+        btor_path: str = ""
+    ) -> Design:
+        """Creates a design from configuration files or BTOR file.
+
+        Args:
+            name (str): Name for the design.
+            jgc_path (str, optional): Path to Jasper config file.
+            dc_path (str, optional): Path to design config file.
+            btor_path (str, optional): Path to BTOR file.
+
+        Returns:
+            Design: The created design object.
+        """
+        if btor_path:
+            return self.mk_btor_design_from_file(btor_path, name)
+        elif jgc_path and dc_path:
+            return self.mk_jg_design_from_pyc(name, jgc_path, dc_path)
+        else:
+            raise ValueError("Must provide either btor_path or both jgc_path and dc_path")
+
+    def mk_btor_proof_two_trace(
+        self,
+        spec: SpecModule | str,
+        design: Design | str,
+        dc: DesignConfig = DesignConfig(),
+    ) -> ProofResult:
+        """Creates a BTOR proof for two trace verification.
+
+        Args:
+            spec (SpecModule | str): The specification module or name.
+            design (Design | str): The design or name.
+            dc (DesignConfig, optional): The design configuration. Defaults to DesignConfig().
+
+        Returns:
+            ProofResult: The result of the proof.
+        """
+        if isinstance(spec, str):
+            if spec not in self.specs:
+                raise ValueError(f"Spec {spec} not found.")
+            spec = self.specs[spec]
+        if isinstance(design, str):
+            if design not in self.designs:
+                raise ValueError(f"Design {design} not found.")
+            design = self.designs[design]
+
+        res = BTORVerifier2Trace(self.gui).verify(spec, design, dc)
+
+        self._push_update(
+            GUIPacket(
+                t=GUIPacket.T.NEW_PROOF,
+                iden=str(len(self.proofs)),
+                sname=spec.name,
+                dname=design.name,
+                result=("PASS" if res.verified else "FAIL"),
+            )
+        )
+        pr = TwoTraceIndPR(spec=spec.name, design=design.name, dc=dc, result=res.verified)
+        self.proofs.append(pr)
+        return pr
+
     def mk_jg_proof_one_trace(
         self, spec: SpecModule | str, design: Design | str
     ) -> ProofResult:
@@ -337,6 +844,51 @@ class ProofManager:
         res = verifier.verify(spec, design.pyc)
         pr = TwoTraceIndPR(
             spec=spec.name, design=design.name, result=res, dc=design.pyc.dc
+        )
+
+        self._push_update(
+            GUIPacket(
+                t=GUIPacket.T.NEW_PROOF,
+                iden=str(len(self.proofs)),
+                proofterm=str(pr),
+                result=("PASS" if res else "FAIL"),
+            )
+        )
+        self.proofs.append(pr)
+        return pr
+
+    def mk_jg_proof_invariant(
+        self, spec: SpecModule | str, design: Design | str, schedule: str
+    ) -> ProofResult:
+        """Creates a JG proof for invariant verification using sequences.
+
+        Args:
+            spec (SpecModule | str): The specification module or name.
+            design (Design | str): The design or name.
+            schedule (str): The sequence schedule name.
+
+        Returns:
+            ProofResult: The result of the proof.
+        """
+        if isinstance(spec, str):
+            if spec not in self.specs:
+                raise ValueError(f"Spec {spec} not found.")
+            spec = self.specs[spec]
+        if isinstance(design, str):
+            if design not in self.designs:
+                raise ValueError(f"Design {design} not found.")
+            design = self.designs[design]
+
+        assert isinstance(
+            design, JGDesign
+        ), "Design must be a JGDesign for Jasper verification."
+
+        mock_or_connect(design.pyc.mock, design.pyc.jgc.port)
+        verifier = JGVerifier1TraceInvariant()
+
+        res = verifier.verify(spec, design.pyc, schedule)
+        pr = OneTraceIndPR(
+            spec=spec.name, design=design.name, dc=design.pyc.dc, result=res
         )
 
         self._push_update(

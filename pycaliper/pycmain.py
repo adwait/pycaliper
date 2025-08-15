@@ -8,6 +8,7 @@ Author: Adwait Godbole, UC Berkeley
 """
 
 import sys
+import os
 import logging
 
 from pycaliper.verif.jgverifier import (
@@ -18,13 +19,15 @@ from pycaliper.verif.jgverifier import (
 from pycaliper.synth.persynthesis import PERSynthesizer
 from pycaliper.synth.iis_strategy import SeqStrategy, RandomStrategy, LLMStrategy
 from pycaliper.svagen import SVAGen
-from pycaliper.pycmanager import (
+from pycaliper.pycsetup import (
     start,
-    PYCTask,
     PYCArgs,
+)
+from pycaliper.proofmanager import (
     get_jgconfig,
     get_designconfig,
     mock_or_connect,
+    ProofManager,
 )
 from pycaliper.jginterface.hierarchyexplorer import HierarchyExplorer
 from pycaliper.jginterface.jgsetup import setup_jasperharness
@@ -101,17 +104,17 @@ def verif_main(
     )
     if bmc == "":
         if onetrace:
-            pyconfig, tmgr, module = start(PYCTask.VERIF1T, args)
+            pyconfig, module = start(True, args)  # Requires Jasper
             verifier = JGVerifier1Trace()
             logger.debug("Running single trace verification.")
         else:
-            pyconfig, tmgr, module = start(PYCTask.VERIF2T, args)
+            pyconfig, module = start(True, args)  # Requires Jasper
             verifier = JGVerifier2Trace()
             logger.debug("Running two trace verification.")
         module.instantiate()
         verifier.verify(module, pyconfig)
     else:
-        pyconfig, tmgr, module = start(PYCTask.VERIFBMC, args)
+        pyconfig, module = start(False, args)  # BMC doesn't require Jasper
         verifier = JGVerifier1TraceBMC()
         logger.debug("Running BMC verification.")
         module.instantiate()
@@ -169,7 +172,7 @@ def persynth_main(
     args = PYCArgs(
         specpath=specpath, jgcpath=jgcpath, dcpath=dcpath, params=params, sdir=sdir
     )
-    pyconfig, tmgr, module = start(PYCTask.PERSYNTH, args)
+    pyconfig, module = start(True, args)  # PER synthesis requires Jasper
 
     match strategy:
         case "seq":
@@ -186,8 +189,13 @@ def persynth_main(
     module.instantiate()
     finalmod = synthesizer.synthesize(module, retries)
 
-    tmgr.save_spec(finalmod)
-    tmgr.save()
+    # Save synthesized specification using ProofManager
+    if sdir:
+        os.makedirs(sdir, exist_ok=True)
+        pm = ProofManager()
+        spec_filename = f"{pyconfig.pycspec}.synthesized.py"
+        spec_path = os.path.join(sdir, spec_filename)
+        pm.save_spec(finalmod, spec_path)
 
 
 @app.command("svagen")
@@ -224,7 +232,7 @@ def svagen_main(
     args = PYCArgs(
         specpath=specpath, jgcpath=jgcpath, dcpath=dcpath, params=params, sdir=sdir
     )
-    pyconfig, tmgr, module = start(PYCTask.SVAGEN, args)
+    pyconfig, module = start(PYCTask.SVAGEN, args)
     module.instantiate()
     svagen = SVAGen()
     svagen.create_pyc_specfile(
@@ -264,9 +272,8 @@ def genhierarchy_main(
     dexplorer = HierarchyExplorer(jgconfig, dc)
     mod = dexplorer.generate_skeleton(root, depth)
     # Save the module
-    with open(path, "x") as f:
-        f.write(mod.full_repr())
-    logger.info(f"Specification written to {path}.")
+    pm = ProofManager()
+    pm.save_spec(mod, path)
 
 
 @app.command("jasperharness")
