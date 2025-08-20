@@ -11,26 +11,15 @@ import sys
 import os
 import logging
 
-from pycaliper.verif.jgverifier import (
-    JGVerifier1Trace,
-    JGVerifier2Trace,
-    JGVerifier1TraceBMC,
-)
-from pycaliper.synth.persynthesis import PERSynthesizer
-from pycaliper.synth.iis_strategy import SeqStrategy, RandomStrategy, LLMStrategy
-from pycaliper.svagen import SVAGen
-from pycaliper.pycsetup import (
-    start,
-    PYCArgs,
-)
 from pycaliper.proofmanager import (
     get_jgconfig,
     get_designconfig,
-    mock_or_connect,
+    PYCArgs,
     ProofManager,
 )
 from pycaliper.jginterface.hierarchyexplorer import HierarchyExplorer
 from pycaliper.jginterface.jgsetup import setup_jasperharness
+from pycaliper.jginterface.jgdesign import JGDesign
 
 import typer
 from typer import Argument, Option
@@ -101,24 +90,18 @@ def verif_main(
         sdir=sdir,
         onetrace=onetrace,
         bmc=bmc,
+        requires_jasper=True,  # Verification requires Jasper connection
     )
+    pm = ProofManager()
+    pyconfig, module = pm.start(args)
     if bmc == "":
         if onetrace:
-            pyconfig, module = start(True, args)  # Requires Jasper
-            verifier = JGVerifier1Trace()
-            logger.debug("Running single trace verification.")
+            pr = pm.mk_jg_proof_one_trace(module, JGDesign("verifmod", pyconfig))
         else:
-            pyconfig, module = start(True, args)  # Requires Jasper
-            verifier = JGVerifier2Trace()
-            logger.debug("Running two trace verification.")
-        module.instantiate()
-        verifier.verify(module, pyconfig)
+            pr = pm.mk_jg_proof_two_trace(module, JGDesign("verifmod", pyconfig))
     else:
-        pyconfig, module = start(False, args)  # BMC doesn't require Jasper
-        verifier = JGVerifier1TraceBMC()
-        logger.debug("Running BMC verification.")
-        module.instantiate()
-        verifier.verify(module, pyconfig, bmc)
+        pr = pm.mk_jg_proof_bounded_spec(module, JGDesign("verifmod", pyconfig), bmc=bmc)
+    logger.info(f"Verification completed. Results: {pr}")
 
 
 @app.command("persynth")
@@ -170,30 +153,21 @@ def persynth_main(
         stepbudget (int): Step budget for synthesis.
     """
     args = PYCArgs(
-        specpath=specpath, jgcpath=jgcpath, dcpath=dcpath, params=params, sdir=sdir
+        specpath=specpath, jgcpath=jgcpath, dcpath=dcpath, params=params, sdir=sdir, 
+        requires_jasper=True
     )
-    pyconfig, module = start(True, args)  # PER synthesis requires Jasper
-
-    match strategy:
-        case "seq":
-            strat = SeqStrategy()
-        case "rand":
-            strat = RandomStrategy()
-        case "llm":
-            strat = LLMStrategy()
-        case _:
-            logger.warning("Invalid strategy, using default strategy.")
-            strat = SeqStrategy()
-
-    synthesizer = PERSynthesizer(pyconfig, strat, fuelbudget, stepbudget)
-    module.instantiate()
-    finalmod = synthesizer.synthesize(module, retries)
+    pm = ProofManager()
+    pyconfig, module = pm.start(args)
+    finalmod, _ = pm.mk_houdini_synthesis_jg(
+        module, JGDesign("synthmod", pyconfig), pyconfig.dc, strategy=strategy,
+        fuel=fuelbudget, steps=stepbudget
+    )
+    logger.info(f"Synthesis completed. Final module: {finalmod.name}")
 
     # Save synthesized specification using ProofManager
     if sdir:
         os.makedirs(sdir, exist_ok=True)
-        pm = ProofManager()
-        spec_filename = f"{pyconfig.pycspec}.synthesized.py"
+        spec_filename = f"{finalmod.name}.synthesized.py"
         spec_path = os.path.join(sdir, spec_filename)
         pm.save_spec(finalmod, spec_path)
 
@@ -230,14 +204,12 @@ def svagen_main(
         sdir (str): Directory to save the generated SVA file to.
     """
     args = PYCArgs(
-        specpath=specpath, jgcpath=jgcpath, dcpath=dcpath, params=params, sdir=sdir
+        specpath=specpath, jgcpath=jgcpath, dcpath=dcpath, params=params, sdir=sdir, 
+        requires_jasper=False
     )
-    pyconfig, module = start(PYCTask.SVAGEN, args)
-    module.instantiate()
-    svagen = SVAGen()
-    svagen.create_pyc_specfile(
-        module, filename=pyconfig.jgc.pycfile_abspath(), dc=pyconfig.dc
-    )
+    pm = ProofManager()
+    pyconfig, module = pm.start(args)
+    pm.generate_sva(module, output_file=pyconfig.jgc.pycfile_abspath(), dc=pyconfig.dc)
 
 
 @app.command("genhierarchy")
@@ -266,13 +238,13 @@ def genhierarchy_main(
         params="",
         sdir="",
     )
+    pm = ProofManager()
     jgconfig = get_jgconfig(jgcpath)
     dc = get_designconfig(dcpath)
-    mock_or_connect(False, jgconfig.port)
+    pm.mock_or_connect(False, jgconfig.port)
     dexplorer = HierarchyExplorer(jgconfig, dc)
     mod = dexplorer.generate_skeleton(root, depth)
     # Save the module
-    pm = ProofManager()
     pm.save_spec(mod, path)
 
 

@@ -9,13 +9,12 @@ import logging
 import sys
 import os
 from vcdvcd import VCDVCD
+import random
 
 from ..per import SpecModule, CtrAlignHole, Logic, Context
 
 from ..vcdutils import get_subtrace
 from ..pycconfig import DesignConfig
-
-from ..jginterface.jgoracle import prove, is_pass, create_vcd_trace
 
 from .synthprog import ZDDLUTSynthProgram
 
@@ -46,13 +45,12 @@ class AlignSynthesizer:
             str: Path to the VCD trace.
         """
         if self._trace_files:
-            import random
             return random.choice(self._trace_files)
         else:
             # Generate a trace if none are available
-            logger.warning("No pre-existing traces found, generating trace on-demand")
-            # For now, return a placeholder - in practice this would generate a trace
-            return "generated_trace.vcd"
+            logger.error("On-demand trace generation not implemented yet.")
+            # TODO: Implement trace generation logic
+            sys.exit(1)
 
     def _inspect_module(self, specmodule: SpecModule) -> bool:
         """Inspect the module for well-formedness.
