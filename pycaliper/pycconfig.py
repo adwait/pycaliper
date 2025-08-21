@@ -96,7 +96,6 @@ class PYConfig(BaseModel):
         sdir (str): Directory to save results to.
         mock (bool): Whether to run in mock mode without Jasper access.
         jgc (JasperConfig): Jasper configuration.
-        pycspec (str): Name of the PyCaliper specification.
         onetrace (bool): Whether to verify only one-trace properties.
         tdir (str): Directory containing VCD trace files.
         dc (DesignConfig): Design configuration.
@@ -110,8 +109,6 @@ class PYConfig(BaseModel):
     # Jasper configuration
     jgc: JasperConfig = JasperConfig()
 
-    # Specification location
-    pycspec: str = ""
     # Use only one trace for verification
     onetrace: bool = False
     # Directory of VCD traces

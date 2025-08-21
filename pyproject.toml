@@ -13,6 +13,7 @@ keywords = ["RTL", "hardware", "formal verification", "domain-specific language"
 requires-python = ">=3.11"
 dependencies = [
     "btor2-opt==0.2.1",
+    "click==8.1.7",
     "dill==0.3.9",
     "flask==3.1.0",
     "flask_socketio==5.5.1",
@@ -21,7 +22,7 @@ dependencies = [
     "openai==1.60.2",
     "ply==3.11",
     "pre-commit==3.8.0",
-    "PyBoolector==3.2.3.20240305.1",
+    "PyBoolector==3.2.3.20231106.1",
     "pydantic==2.9.2",
     "pydantic_core==2.23.4",
     "PySMT==0.9.6",
