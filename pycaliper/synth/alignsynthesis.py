@@ -7,14 +7,14 @@ Author: Adwait Godbole, UC Berkeley
 
 import logging
 import sys
+import os
 from vcdvcd import VCDVCD
+import random
 
 from ..per import SpecModule, CtrAlignHole, Logic, Context
 
 from ..vcdutils import get_subtrace
-from ..pycmanager import PYCManager, DesignConfig
-
-from ..jginterface.jgoracle import prove, is_pass, create_vcd_trace
+from ..pycconfig import DesignConfig
 
 from .synthprog import ZDDLUTSynthProgram
 
@@ -22,25 +22,35 @@ logger = logging.getLogger(__name__)
 
 
 class AlignSynthesizer:
-    def __init__(self, tmgr: PYCManager) -> None:
-        """Initialize the AlignSynthesizer with a PYCManager.
+    def __init__(self, trace_dir: str = None) -> None:
+        """Initialize the AlignSynthesizer with an optional trace directory.
 
         Args:
-            tmgr (PYCManager): The PyCaliper manager for handling tasks.
+            trace_dir (str, optional): Directory containing VCD trace files. 
+                                     If None, traces will be generated as needed.
         """
-        self.tmgr = tmgr
+        self.trace_dir = trace_dir
+        self._trace_files = []
+        if trace_dir and os.path.exists(trace_dir):
+            self._trace_files = [
+                os.path.join(trace_dir, f) 
+                for f in os.listdir(trace_dir) 
+                if f.endswith('.vcd')
+            ]
 
     def _sample_tracepath(self) -> str:
-        """Generate a simulation VCD trace from the design.
+        """Generate or select a simulation VCD trace from the design.
 
         Returns:
-            str: Path to the generated VCD trace.
+            str: Path to the VCD trace.
         """
-        vcd_path = self.tmgr.get_vcd_path_random()
-        if vcd_path is None:
-            logger.error("No traces found.")
+        if self._trace_files:
+            return random.choice(self._trace_files)
+        else:
+            # Generate a trace if none are available
+            logger.error("On-demand trace generation not implemented yet.")
+            # TODO: Implement trace generation logic
             sys.exit(1)
-        return vcd_path
 
     def _inspect_module(self, specmodule: SpecModule) -> bool:
         """Inspect the module for well-formedness.

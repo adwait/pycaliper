@@ -4,8 +4,7 @@ import os
 import unittest
 from tempfile import NamedTemporaryFile
 
-from pycaliper.pycmanager import PYCArgs, PYCTask, start
-from pycaliper.proofmanager import mk_btordesign, ProofManager
+from pycaliper.proofmanager import mk_btordesign, ProofManager, PYCArgs
 from pycaliper.frontend.pyclex import lexer
 from pycaliper.frontend.pycparse import parser
 from pycaliper.frontend.pycgen import PYCGenPass
@@ -20,7 +19,6 @@ from pycaliper.verif.jgverifier import (
 )
 from pycaliper.verif.refinementverifier import RefinementVerifier
 from pycaliper.synth.persynthesis import (
-    PERSynthesizer,
     HoudiniSynthesizerJG,
     HoudiniSynthesizerBTOR,
 )
@@ -80,48 +78,45 @@ class JGVerifierTest(unittest.TestCase):
             sdir="",
             onetrace=True,
             bmc="",
+            requires_jasper=True
         )
-        return start(PYCTask.VERIFBMC, args)
+        pm = ProofManager()
+        return pm.start(args)
 
     def test_regblock(self):
-        (pyconfig, tmgr, regb) = self.gen_test(
+        (pyconfig, regb) = self.gen_test(
             "tests/specs/regblock", "examples/designs/regblock/config.json"
         )
         invverif = JGVerifier2Trace()
-        regb.instantiate()
         invverif.verify(regb, pyconfig)
-        tmgr.close()
 
     def test_counter(self):
-        (pyconfig, tmgr, counter) = self.gen_test(
+        (pyconfig, counter) = self.gen_test(
             "tests/specs/counter", "examples/designs/counter/config.json"
         )
         invverif = JGVerifier1Trace()
-        counter.instantiate()
         invverif.verify(counter, pyconfig)
-        tmgr.close()
 
 
 class JGSynthesisTest(unittest.TestCase):
     def test_jgsynthesizer(self):
-        pyconfig, tmgr, module = start(
-            PYCTask.PERSYNTH,
+        pm = ProofManager()
+        pyconfig, module = pm.start(
             PYCArgs(
                 specpath="tests/specs/regblock_syn.regblock_syn",
                 jgcpath="examples/designs/regblock/config_syn.json",
                 dcpath="",
                 params="",
                 sdir="",
-            ),
+                requires_jasper=True
+            )
         )
         synthesizer = HoudiniSynthesizerJG()
         module.instantiate()
         finalmod, _ = synthesizer.synthesize(
             module, JGDesign("regblock", pyconfig), pyconfig.dc, strategy=SeqStrategy()
         )
-        tmgr.save_spec(finalmod)
-        tmgr.close()
-
+        return finalmod
 
 class JGBMCTest(unittest.TestCase):
     def gen_test(self, specpath, jgcpath, bmc):
@@ -132,18 +127,18 @@ class JGBMCTest(unittest.TestCase):
             sdir="",
             onetrace=True,
             bmc=bmc,
+            requires_jasper=True
         )
-        return start(PYCTask.VERIFBMC, args)
+        pm = ProofManager()
+        return pm.start(args)
 
     def test_adder(self):
-        (pyconfig, tmgr, module) = self.gen_test(
+        (pyconfig, module) = self.gen_test(
             "tests/specs/adder.adder", "examples/designs/adder/config.json", "simstep"
         )
         verifier = JGVerifier1TraceBMC()
         logger.debug("Running BMC verification.")
-        module.instantiate()
         verifier.verify(module, pyconfig, "simstep")
-        tmgr.close()
 
 
 class ParserTest(unittest.TestCase):
@@ -215,7 +210,7 @@ class ReprTest(unittest.TestCase):
             "adder(SpecModule)", addermodstr, "Module name not present in repr"
         )
         self.assertIn("@unroll(3)", addermodstr, "Unrolling not present in repr")
-        self.assertIn("@kind(1)", addermodstr, "Kind decorator not present in repr")
+        self.assertIn("@kinduct(1)", addermodstr, "Kind decorator not present in repr")
         self.assertIn(
             "self.pycassume((~self.rst_ni))",
             addermodstr,
